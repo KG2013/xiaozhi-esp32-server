@@ -41,8 +41,22 @@ public class OTAController {
 
     @Operation(summary = "OTA版本和设备激活状态检查")
     @PostMapping
-    public ResponseEntity<String> checkOTAVersion(@RequestBody DeviceReportReqDTO deviceReportReqDTO) {
-        return createResponse(deviceService.checkDeviceActive(deviceReportReqDTO));
+    public ResponseEntity<String> checkOTAVersion(
+            @RequestBody DeviceReportReqDTO deviceReportReqDTO,
+            @Parameter(name = "Device-Id", description = "设备唯一标识", required = true, in = ParameterIn.HEADER) @RequestHeader("Device-Id") String deviceId,
+            @Parameter(name = "Client-Id", description = "客户端标识", required = false, in = ParameterIn.HEADER) @RequestHeader(value = "Client-Id", required = false) String clientId) {
+        if (StringUtils.isBlank(deviceId)) {
+            return createResponse(DeviceReportRespDTO.createError("Device ID is required"));
+        }
+        if (StringUtils.isBlank(clientId)) {
+            clientId = deviceId;
+        }
+        boolean macAddressValid = isMacAddressValid(deviceId);
+        // 设备Id和Mac地址应是一致的, 并且必须需要application字段
+        if (!macAddressValid) {
+            return createResponse(DeviceReportRespDTO.createError("Invalid device ID"));
+        }
+        return createResponse(deviceService.checkDeviceActive(deviceId, clientId, deviceReportReqDTO));
     }
 
     @Operation(summary = "设备快速检查激活状态")

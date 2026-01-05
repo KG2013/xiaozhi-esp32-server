@@ -52,7 +52,8 @@ public class DeviceController {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    public DeviceController(DeviceService deviceService, RedisUtils redisUtils, SysParamsService sysParamsService, RestTemplate restTemplate, ObjectMapper objectMapper) {
+    public DeviceController(DeviceService deviceService, RedisUtils redisUtils, SysParamsService sysParamsService,
+            RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.deviceService = deviceService;
         this.redisUtils = redisUtils;
         this.sysParamsService = sysParamsService;
@@ -73,13 +74,15 @@ public class DeviceController {
     public Result<String> registerDevice(@RequestBody DeviceRegisterDTO deviceRegisterDTO) {
         String macAddress = deviceRegisterDTO.getMacAddress();
         if (StringUtils.isBlank(macAddress)) {
-            return new Result<String>().error(ErrorCode.NOT_NULL, "mac地址不能为空");
+            return new Result<String>().error(ErrorCode.MCA_NOT_NULL);
         }
         // 生成六位验证码
-        String code = String.valueOf(Math.random()).substring(2, 8);
-        String key = RedisKeys.getDeviceCaptchaKey(code);
+        String code;
+        String key;
         String existsMac = null;
         do {
+            code = String.valueOf(Math.random()).substring(2, 8);
+            key = RedisKeys.getDeviceCaptchaKey(code);
             existsMac = (String) redisUtils.get(key);
         } while (StringUtils.isNotBlank(existsMac));
 
@@ -157,7 +160,8 @@ public class DeviceController {
     private String generateBearerToken() {
         try {
             // 获取当前日期，格式为yyyy-MM-dd
-            String dateStr = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String dateStr = java.time.LocalDate.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
             // 获取MQTT签名密钥
             String signatureKey = sysParamsService.getValue("server.mqtt_signature_key", false);

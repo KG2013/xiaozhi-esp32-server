@@ -57,7 +57,7 @@ public class SysUserServiceImpl extends BaseServiceImpl<SysUserDao, SysUserEntit
         if (users == null || users.isEmpty()) {
             return null;
         }
-        SysUserEntity entity = users.get(0);
+        SysUserEntity entity = users.getFirst();
         return ConvertUtils.sourceToTarget(entity, SysUserDTO.class);
     }
 
@@ -176,7 +176,7 @@ public class SysUserServiceImpl extends BaseServiceImpl<SysUserDao, SysUserEntit
             adminPageUserVO.setStatus(user.getStatus());
             adminPageUserVO.setCreateDate(user.getCreateDate());
             return adminPageUserVO;
-        }).collect(Collectors.toList());
+        }).toList();
         return new PageData<>(list, page.getTotal());
     }
 

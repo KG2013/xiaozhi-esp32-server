@@ -17,6 +17,7 @@ import smhs.modules.agent.entity.AgentChatHistoryEntity;
 import smhs.modules.agent.entity.AgentEntity;
 import smhs.modules.agent.service.AgentChatAudioService;
 import smhs.modules.agent.service.AgentChatHistoryService;
+import smhs.modules.agent.service.AgentChatSummaryService;
 import smhs.modules.agent.service.AgentService;
 import smhs.modules.agent.service.biz.AgentChatHistoryBizService;
 import smhs.modules.device.entity.DeviceEntity;
@@ -36,6 +37,7 @@ public class AgentChatHistoryBizServiceImpl implements AgentChatHistoryBizServic
     private final AgentService agentService;
     private final AgentChatHistoryService agentChatHistoryService;
     private final AgentChatAudioService agentChatAudioService;
+    private final AgentChatSummaryService agentChatSummaryService;
     private final RedisUtils redisUtils;
     private final DeviceService deviceService;
 

@@ -84,7 +84,16 @@ public class AgentChatHistoryServiceImpl extends ServiceImpl<AiAgentChatHistoryD
     @Transactional(rollbackFor = Exception.class)
     public void deleteByAgentId(String agentId, Boolean deleteAudio, Boolean deleteText) {
         if (deleteAudio) {
-            baseMapper.deleteAudioByAgentId(agentId);
+            // 分批删除音频,避免超时
+            List<String> audioIds = baseMapper.getAudioIdsByAgentId(agentId);
+            if (audioIds != null && !audioIds.isEmpty()) {
+                int batchSize = 1000; // 每批删除1000条
+                for (int i = 0; i < audioIds.size(); i += batchSize) {
+                    int end = Math.min(i + batchSize, audioIds.size());
+                    List<String> batch = audioIds.subList(i, end);
+                    baseMapper.deleteAudioByIds(batch);
+                }
+            }
         }
         if (deleteAudio && !deleteText) {
             baseMapper.deleteAudioIdByAgentId(agentId);
@@ -119,7 +128,7 @@ public class AgentChatHistoryServiceImpl extends ServiceImpl<AiAgentChatHistoryD
                 vo.setContent(extractContentFromString(vo.getContent()));
             }
             return vo;
-        }).collect(java.util.stream.Collectors.toList());
+        }).toList();
     }
 
     /**

@@ -32,29 +32,22 @@ public class AgentMcpAccessPointServiceImpl implements AgentMcpAccessPointServic
 
     @Override
     public String getAgentMcpAccessAddress(String id) {
-        // 获取智能体mcp的url前缀
-        String agentMcpUrl = "";
-        try {
-            // 获取到mcp的地址
-            String url = sysParamsService.getValue(Constant.SERVER_MCP_ENDPOINT, true);
-            if (StringUtils.isBlank(url) || "null".equals(url)) {
-                return null;
-            }
-            URI uri = getURI(url);
-            // 获取智能体mcp的url前缀
-             agentMcpUrl = getAgentMcpUrl(uri);
-            // 获取密钥
-            String key = getSecretKey(uri);
-            // 获取加密的token
-            String encryptToken = encryptToken(id, key);
-            // 对token进行URL编码
-            String encodedToken = URLEncoder.encode(encryptToken, StandardCharsets.UTF_8.name());
-            // 返回智能体Mcp路径的格式
-            agentMcpUrl = String.format("%s/mcp/?token=%s", agentMcpUrl, encodedToken);
-        }catch (Exception e){
-            log.warn("解析初始化响应失败: {}", e);
+        // 获取到mcp的地址
+        String url = sysParamsService.getValue(Constant.SERVER_MCP_ENDPOINT, true);
+        if (StringUtils.isBlank(url) || "null".equals(url)) {
+            return null;
         }
-
+        URI uri = getURI(url);
+        // 获取智能体mcp的url前缀
+        String agentMcpUrl = getAgentMcpUrl(uri);
+        // 获取密钥
+        String key = getSecretKey(uri);
+        // 获取加密的token
+        String encryptToken = encryptToken(id, key);
+        // 对token进行URL编码
+        String encodedToken = URLEncoder.encode(encryptToken, StandardCharsets.UTF_8);
+        // 返回智能体Mcp路径的格式
+        agentMcpUrl = "%s/mcp/?token=%s".formatted(agentMcpUrl, encodedToken);
         return agentMcpUrl;
     }
 
@@ -235,7 +228,7 @@ public class AgentMcpAccessPointServiceImpl implements AgentMcpAccessPointServic
         // 使用md5对智能体id进行加密
         String md5 = HashEncryptionUtil.Md5hexDigest(agentId);
         // aes需要加密文本
-        String json = String.format("{\"agentId\": \"%s\"}", md5);
+        String json = "{\"agentId\": \"%s\"}".formatted(md5);
         // 加密后成token值
         return AESUtils.encrypt(key, json);
     }

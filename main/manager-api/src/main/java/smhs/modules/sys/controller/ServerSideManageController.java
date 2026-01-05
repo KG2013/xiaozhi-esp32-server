@@ -31,6 +31,8 @@ import smhs.modules.sys.dto.ServerActionResponseDTO;
 import smhs.modules.sys.enums.ServerActionEnum;
 import smhs.modules.sys.service.SysParamsService;
 import smhs.modules.sys.utils.WebSocketClientManager;
+import smhs.modules.device.service.DeviceService;
+import smhs.common.redis.RedisUtils;
 
 /**
  * 服务端管理控制器
@@ -41,6 +43,8 @@ import smhs.modules.sys.utils.WebSocketClientManager;
 @AllArgsConstructor
 public class ServerSideManageController {
     private final SysParamsService sysParamsService;
+    private final DeviceService deviceService;
+    private final RedisUtils redisUtils;
     private static final ObjectMapper objectMapper;
     static {
         objectMapper = new ObjectMapper();
@@ -85,9 +89,22 @@ public class ServerSideManageController {
             return false;
         }
         String serverSK = sysParamsService.getValue(Constant.SERVER_SECRET, true);
+
+        String deviceId = UUID.randomUUID().toString();
+        String clientId = UUID.randomUUID().toString();
+
+        String redisKey = xiaozhi.common.redis.RedisKeys.getTmpRegisterMacKey(deviceId);
+        redisUtils.set(redisKey, "true", 300); // 5分钟有效期
+
         WebSocketHttpHeaders headers = new WebSocketHttpHeaders();
-        headers.add("device-id", UUID.randomUUID().toString());
-        headers.add("client-id", UUID.randomUUID().toString());
+        headers.add("device-id", deviceId);
+        headers.add("client-id", clientId);
+        try {
+            String token = deviceService.generateWebSocketToken(clientId, deviceId);
+            headers.add("authorization", "Bearer " + token);
+        } catch (Exception e) {
+            throw new RenException(ErrorCode.WEB_SOCKET_CONNECT_FAILED);
+        }
 
         try (WebSocketClientManager client = new WebSocketClientManager.Builder()
                 .connectTimeout(3, TimeUnit.SECONDS)

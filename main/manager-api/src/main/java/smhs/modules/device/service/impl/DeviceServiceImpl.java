@@ -1,6 +1,8 @@
 package smhs.modules.device.service.impl;
 
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
@@ -95,7 +97,7 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
             throw new RenException(ErrorCode.ACTIVATION_CODE_ERROR);
         }
         String deviceId = (String) cacheDeviceId;
-        String safeDeviceId = deviceId;
+        String safeDeviceId = deviceId.replace(":", "_").toLowerCase();
         String cacheDeviceKey = String.format("ota:activation:data:%s", safeDeviceId);
         Map<String, Object> cacheMap = (Map<String, Object>) redisUtils.get(cacheDeviceKey);
         if (cacheMap == null) {
@@ -146,8 +148,8 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
     }
 
     @Override
-    public DeviceReportRespDTO checkDeviceActive(DeviceReportReqDTO deviceReport) {
-
+    public DeviceReportRespDTO checkDeviceActive(String ssid, String clientId,
+            DeviceReportReqDTO deviceReport) {
         DeviceReportRespDTO response = new DeviceReportRespDTO();
         response.setServer_time(buildServerTime());
 
@@ -529,6 +531,40 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         hmac.init(keySpec);
         byte[] signature = hmac.doFinal(content.getBytes(StandardCharsets.UTF_8));
         return Base64.getEncoder().encodeToString(signature);
+    }
+
+    /**
+     * 生成WebSocket认证token 遵循Python端AuthManager的实现逻辑：token = signature.timestamp
+     * 
+     * @param clientId 客户端ID
+     * @param username 用户名 (通常为deviceId/macAddress)
+     * @return 认证token字符串
+     */
+    public String generateWebSocketToken(String clientId, String username)
+            throws NoSuchAlgorithmException, InvalidKeyException {
+        // 从系统参数获取密钥
+        String secretKey = sysParamsService.getValue(Constant.SERVER_SECRET, false);
+        if (StringUtils.isBlank(secretKey)) {
+            throw new IllegalStateException("WebSocket认证密钥未配置(server.secret)");
+        }
+
+        // 获取当前时间戳(秒)
+        long timestamp = System.currentTimeMillis() / 1000;
+
+        // 构建签名内容: clientId|username|timestamp
+        String content = String.format("%s|%s|%d", clientId, username, timestamp);
+
+        // 生成HMAC-SHA256签名
+        Mac hmac = Mac.getInstance("HmacSHA256");
+        SecretKeySpec keySpec = new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        hmac.init(keySpec);
+        byte[] signature = hmac.doFinal(content.getBytes(StandardCharsets.UTF_8));
+
+        // Base64 URL-safe编码签名(去除填充符=)
+        String signatureBase64 = Base64.getUrlEncoder().withoutPadding().encodeToString(signature);
+
+        // 返回格式: signature.timestamp
+        return String.format("%s.%d", signatureBase64, timestamp);
     }
 
     /**

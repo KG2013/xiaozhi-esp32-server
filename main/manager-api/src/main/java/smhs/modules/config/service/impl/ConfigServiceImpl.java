@@ -20,10 +20,12 @@ import smhs.common.redis.RedisUtils;
 import smhs.common.utils.ConvertUtils;
 import smhs.common.utils.JsonUtils;
 import smhs.modules.agent.dao.AgentVoicePrintDao;
+import smhs.modules.agent.entity.AgentContextProviderEntity;
 import smhs.modules.agent.entity.AgentEntity;
 import smhs.modules.agent.entity.AgentPluginMapping;
 import smhs.modules.agent.entity.AgentTemplateEntity;
 import smhs.modules.agent.entity.AgentVoicePrintEntity;
+import smhs.modules.agent.service.AgentContextProviderService;
 import smhs.modules.agent.service.AgentMcpAccessPointService;
 import smhs.modules.agent.service.AgentPluginMappingService;
 import smhs.modules.agent.service.AgentService;
@@ -53,6 +55,7 @@ public class ConfigServiceImpl implements ConfigService {
     private final TimbreService timbreService;
     private final AgentPluginMappingService agentPluginMappingService;
     private final AgentMcpAccessPointService agentMcpAccessPointService;
+    private final AgentContextProviderService agentContextProviderService;
     private final VoiceCloneService cloneVoiceService;
     private final AgentVoicePrintDao agentVoicePrintDao;
 
@@ -73,7 +76,7 @@ public class ConfigServiceImpl implements ConfigService {
         // 查询默认智能体
         AgentTemplateEntity agent = agentTemplateService.getDefaultTemplate();
         if (agent == null) {
-            throw new RenException("默认智能体未找到");
+            throw new RenException(ErrorCode.AGENT_TEMPLATE_NOT_FOUND);
         }
 
         // 构建模块配置
@@ -92,7 +95,8 @@ public class ConfigServiceImpl implements ConfigService {
                 null,
                 null,
                 null,
-                null,
+				null,
+				null,
                 result,
                 isCache);
 
@@ -104,6 +108,15 @@ public class ConfigServiceImpl implements ConfigService {
 
     @Override
     public Map<String, Object> getAgentModels(String macAddress, Map<String, String> selectedModule) {
+        // 检查是否为管理控制台请求
+        String redisKey = RedisKeys.getTmpRegisterMacKey(macAddress);
+        Object isAdminRequest = redisUtils.get(redisKey);
+        
+        if (isAdminRequest != null && "true".equals(isAdminRequest)) {
+            // 管理控制台请求，返回getConfig的结果
+            redisUtils.delete(redisKey); // 使用后清理
+            return (Map<String, Object>) getConfig(true);
+        }
         // 根据MAC地址查找设备
         DeviceEntity device = deviceService.getDeviceByMacAddress(macAddress);
         if (device == null) {
@@ -112,13 +125,13 @@ public class ConfigServiceImpl implements ConfigService {
             if (StringUtils.isNotBlank(cachedCode)) {
                 throw new RenException(ErrorCode.OTA_DEVICE_NEED_BIND, cachedCode);
             }
-            throw new RenException(ErrorCode.OTA_DEVICE_NOT_FOUND, "not found device");
+            throw new RenException(ErrorCode.OTA_DEVICE_NOT_FOUND);
         }
 
         // 获取智能体信息
         AgentEntity agent = agentService.getAgentById(device.getAgentId());
         if (agent == null) {
-            throw new RenException("智能体未找到");
+            throw new RenException(ErrorCode.AGENT_NOT_FOUND);
         }
         // 获取音色信息
         String voice = null;
@@ -179,6 +192,11 @@ public class ConfigServiceImpl implements ConfigService {
             mcpEndpoint = mcpEndpoint.replace("/mcp/", "/call/");
             result.put("mcp_endpoint", mcpEndpoint);
         }
+		// 获取上下文源配置
+        AgentContextProviderEntity contextProviderEntity = agentContextProviderService.getByAgentId(agent.getId());
+        if (contextProviderEntity != null && contextProviderEntity.getContextProviders() != null && !contextProviderEntity.getContextProviders().isEmpty()) {
+			result.put("context_providers", contextProviderEntity.getContextProviders());
+		}
         // 获取声纹信息
         buildVoiceprintConfig(agent.getId(), result);
         // 构建模块配置
@@ -198,6 +216,7 @@ public class ConfigServiceImpl implements ConfigService {
                 agent.getIntentModelId(),
                 agent.getGreetingMessage(),
                 agent.getLeaveMessage(),
+				null,
                 result,
                 true);
 
@@ -281,7 +300,14 @@ public class ConfigServiceImpl implements ConfigService {
             mcpEndpoint = mcpEndpoint.replace("/mcp/", "/call/");
             result.put("mcp_endpoint", mcpEndpoint);
         }
-        // 获取声纹信息
+        
+		// 获取上下文源配置
+        AgentContextProviderEntity contextProviderEntity = agentContextProviderService.getByAgentId(agent.getId());
+        if (contextProviderEntity != null && contextProviderEntity.getContextProviders() != null && !contextProviderEntity.getContextProviders().isEmpty()) {
+			result.put("context_providers", contextProviderEntity.getContextProviders());
+        }
+		
+		// 获取声纹信息
         buildVoiceprintConfig(agent.getId(), result);
 
         // 构建模块配置
@@ -301,6 +327,7 @@ public class ConfigServiceImpl implements ConfigService {
                 agent.getIntentModelId(),
                 agent.getGreetingMessage(),
                 agent.getLeaveMessage(),
+				null,
                 result,
                 true);
 
@@ -479,12 +506,14 @@ public class ConfigServiceImpl implements ConfigService {
             String intentModelId,
             String greetingMessage,
             String leaveMessage,
+			String ragModelId,
             Map<String, Object> result,
             boolean isCache) {
         Map<String, String> selectedModule = new HashMap<>();
 
-        String[] modelTypes = { "VAD", "ASR", "TTS", "Memory", "Intent", "LLM", "VLLM" };
-        String[] modelIds = { vadModelId, asrModelId, ttsModelId, memModelId, intentModelId, llmModelId, vllmModelId };
+        String[] modelTypes = { "VAD", "ASR", "TTS", "Memory", "Intent", "LLM", "VLLM", "RAG" };
+        String[] modelIds = { vadModelId, asrModelId, ttsModelId, memModelId, intentModelId, llmModelId, vllmModelId,
+                ragModelId };
         String intentLLMModelId = null;
         String memLocalShortLLMModelId = null;
 

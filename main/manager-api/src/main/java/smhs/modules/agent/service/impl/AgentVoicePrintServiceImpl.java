@@ -149,7 +149,7 @@ public class AgentVoicePrintServiceImpl extends ServiceImpl<AgentVoicePrintDao, 
         return list.stream().map(entity -> {
             // 遍历转换成AgentVoicePrintVO类型
             return ConvertUtils.sourceToTarget(entity, AgentVoicePrintVO.class);
-        }).collect(java.util.stream.Collectors.toList());
+        }).toList();
 
     }
 
