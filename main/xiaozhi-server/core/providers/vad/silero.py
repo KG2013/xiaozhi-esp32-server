@@ -38,7 +38,18 @@ class VADProvider(VADProviderBase):
         # 至少要多少帧才算有语音
         self.frame_window_threshold = 3
 
+    def __del__(self):
+        if hasattr(self, 'decoder') and self.decoder is not None:
+            try:
+                del self.decoder
+            except Exception:
+                pass
+
     def is_vad(self, conn, opus_packet):
+        # 手动模式：直接返回True，不进行实时VAD检测，所有音频都缓存
+        if conn.client_listen_mode == "manual":
+            return True
+            
         try:
             # 获取连接的Opus配置
             opus_config = getattr(conn, 'opus_config', None)

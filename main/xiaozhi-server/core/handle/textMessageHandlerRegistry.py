@@ -11,6 +11,9 @@ from core.handle.textMessageHandler import TextMessageHandler
 from core.handle.textHandler.serverMessageHandler import ServerTextMessageHandler
 from core.handle.textHandler.volumeMessageHandler import VolumeTextMessageHandler
 
+from core.handle.textHandler.pingMessageHandler import PingMessageHandler
+
+
 TAG = __name__
 
 
@@ -33,6 +36,8 @@ class TextMessageHandlerRegistry:
             VolumeTextMessageHandler(),
             GreetingTextMessageHandler(),
             LeaveTextMessageHandler(),
+            PingMessageHandler(),
+
         ]
 
         for handler in handlers:

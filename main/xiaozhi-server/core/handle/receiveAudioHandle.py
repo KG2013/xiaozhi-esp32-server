@@ -126,7 +126,7 @@ async def max_out_size(conn):
     await send_stt_message(conn, text)
     file_path = "config/assets/max_output_size.wav"
     opus_config = getattr(conn, 'opus_config', None)
-    opus_packets = audio_to_data(
+    opus_packets = await audio_to_data(
         file_path,
         opus_config=opus_config
     )
@@ -149,7 +149,7 @@ async def check_bind_device(conn):
         # 播放提示音
         music_path = "config/assets/bind_code.wav"
         opus_config = getattr(conn, 'opus_config', None)
-        opus_packets = audio_to_data(
+        opus_packets = await audio_to_data(
             music_path,
             opus_config=opus_config
         )
@@ -161,7 +161,7 @@ async def check_bind_device(conn):
                 digit = conn.bind_code[i]
                 num_path = f"config/assets/bind_code/{digit}.wav"
                 opus_config = getattr(conn, 'opus_config', None)
-                num_packets = audio_to_data(
+                num_packets = await audio_to_data(
                     num_path,
                     opus_config=opus_config
                 )
@@ -177,7 +177,7 @@ async def check_bind_device(conn):
         await send_stt_message(conn, text)
         music_path = "config/assets/bind_not_found.wav"
         opus_config = getattr(conn, 'opus_config', None)
-        opus_packets = audio_to_data(
+        opus_packets = await audio_to_data(
             music_path,
             opus_config=opus_config
         )

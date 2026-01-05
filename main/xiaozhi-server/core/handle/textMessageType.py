@@ -12,3 +12,4 @@ class TextMessageType(Enum):
     VOLUME = "volume"
     LEAVE = "leave"
     WELCOME = "welcome"
+    PING = "ping"

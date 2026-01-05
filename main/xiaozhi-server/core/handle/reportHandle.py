@@ -19,7 +19,7 @@ from typing import Optional
 TAG = __name__
 
 
-def report(conn, type, text, opus_data, report_time):
+async def report(conn, type, text, opus_data, report_time):
     """执行聊天记录上报操作
 
     Args:
@@ -35,7 +35,7 @@ def report(conn, type, text, opus_data, report_time):
         else:
             audio_data = None
         # 执行上报
-        manage_report(
+       await manage_report(
             ssid=conn.device_id,
             session_id=conn.session_id,
             chat_type=type,
@@ -70,6 +70,7 @@ def opus_to_wav(conn, opus_data):
     pcm_data_bytes = b"".join(pcm_data)
     num_samples = len(pcm_data_bytes) // 2  # 16-bit samples
 
+
     # 获取采样率，如果有配置则使用配置的采样率，否则使用默认16000
     sample_rate = opus_config.sample_rate if opus_config else 16000
     num_channels = opus_config.channels if opus_config else 1
@@ -84,13 +85,14 @@ def opus_to_wav(conn, opus_data):
     wav_header.extend(b"fmt ")  # Subchunk1ID
     wav_header.extend((16).to_bytes(4, "little"))  # Subchunk1Size
     wav_header.extend((1).to_bytes(2, "little"))  # AudioFormat (PCM)
-    wav_header.extend((num_channels).to_bytes(2, "little"))  # NumChannels
-    wav_header.extend((sample_rate).to_bytes(4, "little"))  # SampleRate
-    wav_header.extend((byte_rate).to_bytes(4, "little"))  # ByteRate
-    wav_header.extend((block_align).to_bytes(2, "little"))  # BlockAlign
+    wav_header.extend((1).to_bytes(2, "little"))  # NumChannels
+    wav_header.extend((16000).to_bytes(4, "little"))  # SampleRate
+    wav_header.extend((32000).to_bytes(4, "little"))  # ByteRate
+    wav_header.extend((2).to_bytes(2, "little"))  # BlockAlign
     wav_header.extend((16).to_bytes(2, "little"))  # BitsPerSample
     wav_header.extend(b"data")  # Subchunk2ID
-    wav_header.extend(len(pcm_data_bytes).to_bytes(4, "little"))  # Subchunk2Size
+    wav_header.extend(len(pcm_data_bytes).to_bytes(4, "little")) 
+
 
     # 返回完整的WAV数据
     return bytes(wav_header) + pcm_data_bytes

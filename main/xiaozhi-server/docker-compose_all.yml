@@ -75,8 +75,9 @@ services:
       - MYSQL_DATABASE=smhs_esp32_server
       - MYSQL_INITDB_ARGS="--character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci"
   # redis模块
+
   smhs-esp32-server-redis:
-    image: redis
+    image: redis:8.0
     expose:
       - 6379
     container_name: smhs-esp32-server-redis
