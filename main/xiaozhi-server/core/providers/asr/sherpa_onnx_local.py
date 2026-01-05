@@ -121,7 +121,7 @@ class ASRProvider(ASRProviderBase):
             return samples_float32, f.getframerate()
 
     async def speech_to_text(
-        self, opus_data: List[bytes], session_id: str, audio_format="opus"
+        self, opus_data: List[bytes], session_id: str, audio_format="opus", opus_config=None
     ) -> Tuple[Optional[str], Optional[str]]:
         """语音转文本主处理逻辑"""
         file_path = None
@@ -131,7 +131,7 @@ class ASRProvider(ASRProviderBase):
             if audio_format == "pcm":
                 pcm_data = opus_data
             else:
-                pcm_data = self.decode_opus(opus_data)
+                pcm_data = self.decode_opus(opus_data, opus_config)
             file_path = self.save_audio_to_file(pcm_data, session_id)
             logger.bind(tag=TAG).debug(
                 f"音频文件保存耗时: {time.time() - start_time:.3f}s | 路径: {file_path}"

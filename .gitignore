@@ -171,6 +171,7 @@ main/manager-api/.vscode
 # Ignore webpack cache directory
 main/manager-web/.webpack_cache/
 main/xiaozhi-server/mysql
+main/smhs-server/data
 uploadfile
 *.json
 .vscode
@@ -183,3 +184,6 @@ uploadfile
 !main/manager-mobile/**/env/
 !main/manager-mobile/**/.env*
 !main/manager-mobile/**/*.json
+main/smhs-server/models/SenseVoiceSmall/model.pt
+main/manager-api/src/main/resources/application.yml
+.gitignore

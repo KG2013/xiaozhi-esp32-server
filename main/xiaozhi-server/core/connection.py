@@ -40,6 +40,7 @@ from config.logger import setup_logging, build_module_string, create_connection_
 from config.manage_api_client import DeviceNotFoundException, DeviceBindException
 from core.utils.prompt_manager import PromptManager
 from core.utils.voiceprint_provider import VoiceprintProvider
+from core.utils.performance_tracker import PerformanceTracker
 from core.utils import textUtils
 
 TAG = __name__
@@ -81,6 +82,12 @@ class ConnectionHandler:
         self.max_output_size = 0
         self.chat_history_conf = 0
         self.audio_format = "opus"
+        self.frame_duration = 60
+        self.vbr = 1
+        self.opus_config = None  # Opus配置，将在handleHelloMessage中初始化
+        
+        # 是否播放开场欢迎语
+        self.play_welcome_audio = False
 
         # 客户端状态相关
         self.client_abort = False
@@ -159,6 +166,9 @@ class ConnectionHandler:
 
         # 初始化提示词管理器
         self.prompt_manager = PromptManager(config, self.logger)
+        
+        # 初始化性能追踪器
+        self.performance_tracker = PerformanceTracker()
 
     async def handle_connection(self, ws):
         try:
@@ -192,7 +202,7 @@ class ConnectionHandler:
             # 启动超时检查任务
             self.timeout_task = asyncio.create_task(self._check_timeout())
 
-            self.welcome_msg = self.config["xiaozhi"]
+            self.welcome_msg = self.config["smhs"]
             self.welcome_msg["session_id"] = self.session_id
 
             # 获取差异化配置
@@ -220,7 +230,7 @@ class ConnectionHandler:
                 self.logger.bind(tag=TAG).error(f"最终清理时出错: {final_error}")
                 # 确保即使保存记忆失败，也要关闭连接
                 try:
-                    await self.close(ws)
+                    await self.close(ws, reason="Connection error, force close")
                 except Exception as close_error:
                     self.logger.bind(tag=TAG).error(
                         f"强制关闭连接时出错: {close_error}"
@@ -254,7 +264,7 @@ class ConnectionHandler:
         finally:
             # 立即关闭连接，不等待记忆保存完成
             try:
-                await self.close(ws)
+                await self.close(ws, reason="Connection completed, closing after saving memory")
             except Exception as close_error:
                 self.logger.bind(tag=TAG).error(
                     f"保存记忆后关闭连接失败: {close_error}"
@@ -599,6 +609,11 @@ class ConnectionHandler:
             self.chat_history_conf = int(private_config["chat_history_conf"])
         if private_config.get("mcp_endpoint", None) is not None:
             self.config["mcp_endpoint"] = private_config["mcp_endpoint"]
+        # 存储欢迎语和告别语
+        if private_config.get("greetingMessage", None) is not None:
+            self.config["greetingMessage"] = private_config["greetingMessage"]
+        if private_config.get("leaveMessage", None) is not None:
+            self.config["leaveMessage"] = private_config["leaveMessage"]
         try:
             modules = initialize_modules(
                 self.logger,
@@ -748,11 +763,23 @@ class ConnectionHandler:
             # 使用带记忆的对话
             memory_str = None
             if self.memory is not None:
+                # 记录记忆查询开始时间
+                if hasattr(self, 'performance_tracker'):
+                    self.performance_tracker.record("memory_query_start")
+                
                 future = asyncio.run_coroutine_threadsafe(
                     self.memory.query_memory(query), self.loop
                 )
                 memory_str = future.result()
+                
+                # 记录记忆查询结束时间
+                if hasattr(self, 'performance_tracker'):
+                    self.performance_tracker.record("memory_query_end")
 
+            # 记录LLM开始时间
+            if hasattr(self, 'performance_tracker'):
+                self.performance_tracker.record("llm_start")
+            
             if self.intent_type == "function_call" and functions is not None:
                 # 使用支持functions的streaming接口
                 llm_responses = self.llm.response_with_functions(
@@ -817,6 +844,11 @@ class ConnectionHandler:
 
             if content is not None and len(content) > 0:
                 if not tool_call_flag:
+                    # 记录LLM首次返回文本的时间
+                    if hasattr(self, 'performance_tracker') and not hasattr(self, '_llm_first_token_recorded'):
+                        self.performance_tracker.record("llm_first_token")
+                        self._llm_first_token_recorded = True
+                    
                     response_message.append(content)
                     self.tts.tts_text_queue.put(
                         TTSMessageDTO(
@@ -874,6 +906,13 @@ class ConnectionHandler:
                 ).result()
                 self._handle_function_result(result, function_call_data, depth=depth)
 
+        # 记录LLM结束时间
+        if hasattr(self, 'performance_tracker'):
+            self.performance_tracker.record("llm_end")
+            # 清除首次token标记，为下次调用准备
+            if hasattr(self, '_llm_first_token_recorded'):
+                delattr(self, '_llm_first_token_recorded')
+        
         # 存储对话内容
         if len(response_message) > 0:
             text_buff = "".join(response_message)
@@ -984,8 +1023,24 @@ class ConnectionHandler:
         self.client_is_speaking = False
         self.logger.bind(tag=TAG).debug(f"清除服务端讲话状态")
 
-    async def close(self, ws=None):
-        """资源清理方法"""
+    async def close(self, ws=None, reason="Unknown reason", code=1000):
+        """资源清理方法
+        
+        Args:
+            ws: WebSocket连接对象（可选）
+            reason: 关闭连接的原因，用于日志记录和发送到客户端
+            code: WebSocket关闭状态码，默认1000（正常关闭）
+        """
+        self.logger.bind(tag=TAG).info(f"开始关闭连接，原因: {reason}, 状态码: {code}")
+        
+        # 处理关闭原因的长度限制（WebSocket协议限制reason最多123字节）
+        reason_bytes = reason.encode('utf-8')
+        if len(reason_bytes) > 123:
+            # 如果超过123字节，截断并添加省略号
+            reason_bytes = reason_bytes[:120] + "...".encode('utf-8')
+            reason = reason_bytes.decode('utf-8', errors='ignore')
+            self.logger.bind(tag=TAG).warning(f"关闭原因过长，已截断为: {reason}")
+        
         try:
             # 清理音频缓冲区
             if hasattr(self, "audio_buffer"):
@@ -1016,20 +1071,21 @@ class ConnectionHandler:
             # 清空任务队列
             self.clear_queues()
 
-            # 关闭WebSocket连接
+            # 关闭WebSocket连接，将关闭原因发送到客户端
             try:
                 if ws:
                     # 安全地检查WebSocket状态并关闭
                     try:
                         if hasattr(ws, "closed") and not ws.closed:
-                            await ws.close()
+                            await ws.close(code=code, reason=reason)
                         elif hasattr(ws, "state") and ws.state.name != "CLOSED":
-                            await ws.close()
+                            await ws.close(code=code, reason=reason)
                         else:
                             # 如果没有closed属性，直接尝试关闭
-                            await ws.close()
-                    except Exception:
-                        # 如果关闭失败，忽略错误
+                            await ws.close(code=code, reason=reason)
+                    except Exception as e:
+                        # 如果关闭失败，记录错误但继续执行
+                        self.logger.bind(tag=TAG).warning(f"关闭WebSocket连接时出错: {e}")
                         pass
                 elif self.websocket:
                     try:
@@ -1037,17 +1093,18 @@ class ConnectionHandler:
                             hasattr(self.websocket, "closed")
                             and not self.websocket.closed
                         ):
-                            await self.websocket.close()
+                            await self.websocket.close(code=code, reason=reason)
                         elif (
                             hasattr(self.websocket, "state")
                             and self.websocket.state.name != "CLOSED"
                         ):
-                            await self.websocket.close()
+                            await self.websocket.close(code=code, reason=reason)
                         else:
                             # 如果没有closed属性，直接尝试关闭
-                            await self.websocket.close()
-                    except Exception:
-                        # 如果关闭失败，忽略错误
+                            await self.websocket.close(code=code, reason=reason)
+                    except Exception as e:
+                        # 如果关闭失败，记录错误但继续执行
+                        self.logger.bind(tag=TAG).warning(f"关闭WebSocket连接时出错: {e}")
                         pass
             except Exception as ws_error:
                 self.logger.bind(tag=TAG).error(f"关闭WebSocket连接时出错: {ws_error}")
@@ -1065,7 +1122,7 @@ class ConnectionHandler:
                     )
                 self.executor = None
 
-            self.logger.bind(tag=TAG).info("连接资源已释放")
+            self.logger.bind(tag=TAG).info(f"连接资源已释放，关闭原因: {reason}")
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"关闭连接时出错: {e}")
         finally:
@@ -1127,12 +1184,13 @@ class ConnectionHandler:
                         > self.timeout_seconds * 1000
                     ):
                         if not self.stop_event.is_set():
-                            self.logger.bind(tag=TAG).info("连接超时，准备关闭")
+                            timeout_seconds = self.timeout_seconds
+                            self.logger.bind(tag=TAG).info(f"连接超时（{timeout_seconds}秒），准备关闭")
                             # 设置停止事件，防止重复处理
                             self.stop_event.set()
                             # 使用 try-except 包装关闭操作，确保不会因为异常而阻塞
                             try:
-                                await self.close(self.websocket)
+                                await self.close(self.websocket, reason=f"Connection timeout ({timeout_seconds}s)")
                             except Exception as close_error:
                                 self.logger.bind(tag=TAG).error(
                                     f"超时关闭连接时出错: {close_error}"

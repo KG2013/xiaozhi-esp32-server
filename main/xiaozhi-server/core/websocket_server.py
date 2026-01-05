@@ -7,7 +7,7 @@ from core.connection import ConnectionHandler
 from config.config_loader import get_config_from_api
 from core.auth import AuthManager, AuthenticationError
 from core.utils.modules_initialize import initialize_modules
-from core.utils.util import check_vad_update, check_asr_update
+from core.utils.util import check_vad_update, check_asr_update, transform_device_id
 
 TAG = __name__
 
@@ -46,7 +46,7 @@ class WebSocketServer:
     async def start(self):
         server_config = self.config["server"]
         host = server_config.get("ip", "0.0.0.0")
-        port = int(server_config.get("port", 8000))
+        port = int(server_config.get("port", 18000))
 
         async with websockets.serve(
             self._handle_connection, host, port, process_request=self._http_response
@@ -62,17 +62,22 @@ class WebSocketServer:
             # 从 WebSocket 请求中获取路径
             request_path = websocket.request.path
             if not request_path:
-                self.logger.bind(tag=TAG).error("无法获取请求路径")
-                await websocket.close()
+                self.logger.bind(tag=TAG).error("无法获取请求路径，关闭连接")
+                await websocket.close(code=1008, reason="Cannot get request path")
                 return
             parsed_url = urlparse(request_path)
             query_params = parse_qs(parsed_url.query)
             if "device-id" not in query_params:
                 await websocket.send("端口正常，如需测试连接，请使用test_page.html")
-                await websocket.close()
+                self.logger.bind(tag=TAG).info("未提供device-id参数，关闭连接")
+                await websocket.close(code=1008, reason="device-id parameter missing")
                 return
             else:
-                websocket.request.headers["device-id"] = query_params["device-id"][0]
+                device_id_raw = query_params["device-id"][0]
+                # 如果没有从连接参数中获取 device-type，则默认为 0
+                device_type = query_params.get("device-type", ["0"])[0] or "0"
+                # 通过 transform_device_id 方法进行转换
+                websocket.request.headers["device-id"] = transform_device_id(device_id_raw, device_type)
             if "client-id" in query_params:
                 websocket.request.headers["client-id"] = query_params["client-id"][0]
             if "authorization" in query_params:
@@ -86,7 +91,8 @@ class WebSocketServer:
             await self._handle_auth(websocket)
         except AuthenticationError:
             await websocket.send("认证失败")
-            await websocket.close()
+            self.logger.bind(tag=TAG).info("认证失败，关闭连接")
+            await websocket.close(code=1008, reason="Authentication failed")
             return
         # 创建ConnectionHandler时传入当前server实例
         handler = ConnectionHandler(
@@ -110,12 +116,15 @@ class WebSocketServer:
             try:
                 # 安全地检查WebSocket状态并关闭
                 if hasattr(websocket, "closed") and not websocket.closed:
-                    await websocket.close()
+                    self.logger.bind(tag=TAG).info("连接处理完成，服务器端关闭WebSocket连接")
+                    await websocket.close(code=1000, reason="Connection processing completed")
                 elif hasattr(websocket, "state") and websocket.state.name != "CLOSED":
-                    await websocket.close()
+                    self.logger.bind(tag=TAG).info("连接处理完成，服务器端关闭WebSocket连接")
+                    await websocket.close(code=1000, reason="Connection processing completed")
                 else:
                     # 如果没有closed属性，直接尝试关闭
-                    await websocket.close()
+                    self.logger.bind(tag=TAG).info("连接处理完成，服务器端关闭WebSocket连接")
+                    await websocket.close(code=1000, reason="Connection processing completed")
             except Exception as close_error:
                 self.logger.bind(tag=TAG).error(
                     f"服务器端强制关闭连接时出错: {close_error}"

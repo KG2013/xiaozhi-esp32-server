@@ -10,7 +10,8 @@ from config.logger import setup_logging
 from core.utils.tts import MarkdownCleaner
 from core.utils.util import parse_string_to_list
 from core.providers.tts.base import TTSProviderBase
-from core.utils import opus_encoder_utils, textUtils
+from core.utils import textUtils
+from core.utils.util import pcm_to_data_stream
 from core.providers.tts.dto.dto import SentenceType, ContentType
 
 TAG = __name__
@@ -64,9 +65,6 @@ class TTSProvider(TTSProviderBase):
         }
         self.audio_file_type = defult_audio_setting.get("format", "pcm")
 
-        self.opus_encoder = opus_encoder_utils.OpusEncoderUtils(
-            sample_rate=24000, channels=1, frame_size_ms=60
-        )
 
         # PCM缓冲区
         self.pcm_buffer = bytearray()
@@ -163,10 +161,11 @@ class TTSProvider(TTSProviderBase):
             payload["timber_weights"] = self.timber_weights
             payload["voice_setting"]["voice_id"] = ""
 
+        opus_config = self.get_opus_config(default_sample_rate=24000, default_frame_duration_ms=60)
         frame_bytes = int(
-            self.opus_encoder.sample_rate
-            * self.opus_encoder.channels  # 1
-            * self.opus_encoder.frame_size_ms
+            opus_config.sample_rate
+            * opus_config.channels  # 1
+            * opus_config.frame_duration_ms
             / 1000
             * 2
         )  # 16-bit = 2 bytes
@@ -228,16 +227,22 @@ class TTSProvider(TTSProviderBase):
                             frame = bytes(self.pcm_buffer[:frame_bytes])
                             del self.pcm_buffer[:frame_bytes]
 
-                            self.opus_encoder.encode_pcm_to_opus_stream(
-                                frame, end_of_stream=False, callback=self.handle_opus
+                            opus_config = self.get_opus_config(default_sample_rate=24000, default_frame_duration_ms=60)
+                            pcm_to_data_stream(
+                                frame,
+                                is_opus=True,
+                                callback=self.handle_opus,
+                                opus_config=opus_config
                             )
 
                     # flush 剩余不足一帧的数据
                     if self.pcm_buffer:
-                        self.opus_encoder.encode_pcm_to_opus_stream(
+                        opus_config = self.get_opus_config(default_sample_rate=24000, default_frame_duration_ms=60)
+                        pcm_to_data_stream(
                             bytes(self.pcm_buffer),
-                            end_of_stream=True,
+                            is_opus=True,
                             callback=self.handle_opus,
+                            opus_config=opus_config
                         )
                         self.pcm_buffer.clear()
 
@@ -252,8 +257,6 @@ class TTSProvider(TTSProviderBase):
     async def close(self):
         """资源清理"""
         await super().close()
-        if hasattr(self, "opus_encoder"):
-            self.opus_encoder.close()
 
     def to_tts(self, text: str) -> list:
         """非流式TTS处理，用于测试及保存音频文件的场景
@@ -313,26 +316,14 @@ class TTSProvider(TTSProviderBase):
                         logger.bind(tag=TAG).warning(f"无效数据块: {e}")
                         continue
 
-                # 计算每帧的字节数
-                frame_bytes = int(
-                    self.opus_encoder.sample_rate
-                    * self.opus_encoder.channels
-                    * self.opus_encoder.frame_size_ms
-                    / 1000
-                    * 2
+                # 使用pcm_to_data_stream处理PCM数据
+                opus_config = self.get_opus_config(default_sample_rate=24000, default_frame_duration_ms=60)
+                pcm_to_data_stream(
+                    bytes(pcm_data),
+                    is_opus=True,
+                    callback=lambda opus: opus_datas.append(opus),
+                    opus_config=opus_config
                 )
-
-                # 分帧处理合并后的PCM数据
-                for i in range(0, len(pcm_data), frame_bytes):
-                    frame = bytes(pcm_data[i:i+frame_bytes])
-                    if len(frame) < frame_bytes:
-                        frame += b"\x00" * (frame_bytes - len(frame))
- 
-                    self.opus_encoder.encode_pcm_to_opus_stream(
-                        frame,
-                        end_of_stream=(i + frame_bytes >= len(pcm_data)),
-                        callback=lambda opus: opus_datas.append(opus)
-                    )
 
                 return opus_datas
 

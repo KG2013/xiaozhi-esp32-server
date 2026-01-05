@@ -24,24 +24,45 @@
                   <el-checkbox v-model="scope.row.selected"></el-checkbox>
                 </template>
               </el-table-column>
-              <el-table-column :label="$t('device.model')" prop="model" align="center">
+              <!-- <el-table-column :label="$t('device.model')" prop="model" align="center">
                 <template slot-scope="scope">
                   {{ getFirmwareTypeName(scope.row.model) }}
                 </template>
-              </el-table-column>
-              <el-table-column :label="$t('device.firmwareVersion')" prop="firmwareVersion"
+              </el-table-column> -->
+              <!-- <el-table-column :label="$t('device.roleName')" prop=""
+                align="center"></el-table-column> -->
+              <el-table-column :label="$t('device.deviceCode')" prop="ssid"
                 align="center"></el-table-column>
-              <el-table-column :label="$t('device.macAddress')" prop="macAddress" align="center"></el-table-column>
+              <el-table-column :label="$t('device.deviceBrand')" prop="deviceBrand"
+                align="center"></el-table-column>
+              <el-table-column :label="$t('device.deviceChannel')" prop="deviceChannel"
+              align="center"></el-table-column>
+              <el-table-column :label="$t('device.deviceSeries')" prop="deviceSeries"
+              align="center"></el-table-column>
+              <el-table-column :label="$t('device.deviceType')" prop="deviceType"
+              align="center"></el-table-column>
+              <el-table-column :label="$t('device.deviceModel')" prop="deviceModel"
+              align="center"></el-table-column>
+              <el-table-column :label="$t('device.deviceStatus')" prop="deviceStatusName"
+              align="center"></el-table-column>
+              <el-table-column :label="$t('device.deviceRemarks')" prop="remark"
+              align="center"></el-table-column>
+              <el-table-column :label="$t('device.deviceCreateTime')" prop="createDate"
+              align="center"></el-table-column>
+              <el-table-column :label="$t('device.deviceUpdateTime')" prop="updateDate"
+              align="center"></el-table-column>
+
+              <!-- <el-table-column :label="$t('device.macAddress')" prop="macAddress" align="center"></el-table-column>
               <el-table-column :label="$t('device.bindTime')" prop="bindTime" align="center"></el-table-column>
               <el-table-column :label="$t('device.lastConversation')" prop="lastConversation"
-                align="center"></el-table-column>
-              <el-table-column :label="$t('device.deviceStatus')" prop="deviceStatus" align="center">
+                align="center"></el-table-column> -->
+              <!-- <el-table-column :label="$t('device.deviceStatus')" prop="deviceStatus" align="center">
                 <template slot-scope="scope">
                   <el-tag v-if="scope.row.deviceStatus === 'online'" type="success">{{ $t('device.online') }}</el-tag>
                   <el-tag v-else type="danger">{{ $t('device.offline') }}</el-tag>
                 </template>
-              </el-table-column>
-              <el-table-column :label="$t('device.remark')" align="center">
+              </el-table-column> -->
+              <!-- <el-table-column :label="$t('device.remark')" align="center">
                 <template #default="{ row }">
                   <el-input v-show="row.isEdit" v-model="row.remark" size="mini" maxlength="64" show-word-limit
                     @blur="onRemarkBlur(row)" @keyup.enter.native="onRemarkEnter(row)" />
@@ -52,17 +73,24 @@
                     </span>
                   </span>
                 </template>
-              </el-table-column>
-              <el-table-column :label="$t('device.autoUpdate')" align="center">
+              </el-table-column> -->
+              <!-- <el-table-column :label="$t('device.autoUpdate')" align="center">
                 <template slot-scope="scope">
                   <el-switch v-model="scope.row.otaSwitch" size="mini" active-color="#13ce66" inactive-color="#ff4949"
                     @change="handleOtaSwitchChange(scope.row)"></el-switch>
                 </template>
-              </el-table-column>
+              </el-table-column> -->
+
               <el-table-column :label="$t('device.operation')" align="center">
                 <template slot-scope="scope">
-                  <el-button size="mini" type="text" @click="handleUnbind(scope.row.device_id)">
-                    {{ $t('device.unbind') }}
+                  <el-button size="mini" type="text" @click="deviceView(scope.row.ssid)">
+                    {{ $t('device.view') }}
+                  </el-button>
+                  <el-button size="mini" type="text" @click="handleEnable(scope.row)">
+                    {{scope.row.deviceStatus==1 ? '开启' : '禁用'}}
+                  </el-button>
+                  <el-button size="mini" type="text" @click="deviceDelete(scope.row.ssid)">
+                    {{ $t('device.isdelete') }}
                   </el-button>
                 </template>
               </el-table-column>
@@ -73,19 +101,31 @@
                 <el-button size="mini" type="primary" class="select-all-btn" @click="handleSelectAll">
                   {{ isCurrentPageAllSelected ? $t('common.deselectAll') : $t('common.selectAll') }}
                 </el-button>
-                <el-button type="success" size="mini" class="add-device-btn" @click="handleAddDevice">
+                <el-button type="success" size="mini" class="add-device-btn" @click="deviceAdd()" >
+                  {{ $t('device.deviceAdd') }}
+                </el-button>
+                <el-button type="success" size="mini" class="add-device-btn" @click="batchDeleteDevice()" >
+                  批量删除 
+                </el-button>
+                <el-button type="success" size="mini" class="add-device-btn" @click="handleBatchEnable(true)" >
+                  批量启用 
+                </el-button>
+                <el-button type="success" size="mini" class="add-device-btn" @click="handleBatchEnable(false)" >
+                  批量禁用 
+                </el-button>
+                <!-- <el-button type="success" size="mini" class="add-device-btn" @click="handleAddDevice">
                   {{ $t('device.bindWithCode') }}
-                </el-button>
-                <el-button type="success" size="mini" class="add-device-btn" @click="handleManualAddDevice">
+                </el-button> -->
+                <!-- <el-button type="success" size="mini" class="add-device-btn" @click="handleManualAddDevice">
                   {{ $t('device.manualAdd') }}
-                </el-button>
-                <el-button size="mini" type="danger" icon="el-icon-delete" @click="deleteSelected">
+                </el-button> -->
+                <!-- <el-button size="mini" type="danger" icon="el-icon-delete" @click="deleteSelected">
                   {{ $t('device.unbind') }}
-                </el-button>
+                </el-button> -->
               </div>
               <div class="custom-pagination">
                 <el-select v-model="pageSize" @change="handlePageSizeChange" class="page-size-select">
-                  <el-option v-for="item in pageSizeOptions" :key="item"
+                  <el-option v-for="item in pageSizeOptions" :key="item" 
                     :label="$t('dictManagement.itemsPerPage').replace('{items}', item)" :value="item">
                   </el-option>
                 </el-select>
@@ -103,7 +143,7 @@
                   {{ $t('dictManagement.nextPage') }}
                 </button>
                 <span class="total-text">
-                  {{ $t('dictManagement.totalRecords').replace('{total}', deviceList.length) }}
+                  共{{ deviceList.length }}条记录
                 </span>
               </div>
             </div>
@@ -112,10 +152,132 @@
       </div>
     </div>
 
-    <AddDeviceDialog :visible.sync="addDeviceDialogVisible" :agent-id="currentAgentId"
+    <el-dialog :title="dialogTitle" :visible.sync="dialogFormVisible" width="50%">
+      <el-collapse v-model="activeNames" @change="handleChange">
+        <el-collapse-item title="设备基础信息" name="1" >
+          <div style="padding: 0 20px;">
+            <el-form :model="ruleForm" :rules="rules" ref="ruleForm" label-width="80px" class="demo-ruleForm">
+              <div class="item">
+                <!-- <el-form-item label="角色" prop="roleName">
+                  <el-select v-model="ruleForm.roleName" size="small" clearable filterable placeholder="请选择角色">
+                    <el-option
+                      v-for="item in options"
+                      :key="item.value"
+                      :label="item.label"
+                      :value="item.value">
+                    </el-option>
+                  </el-select>
+                </el-form-item> -->
+                <el-form-item label="品牌" prop="deviceBrand">
+                  <el-select :disabled="isViewMode" v-model="ruleForm.deviceBrand" size="small" clearable filterable placeholder="请选择品牌">
+                    <el-option
+                      v-for="item in dictDeviceBrand"
+                      :key="item.key"
+                      :label="item.name"
+                      :value="item.key">
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="渠道" prop="deviceChannel">
+                  <el-select :disabled="isViewMode" v-model="ruleForm.deviceChannel" size="small" clearable filterable placeholder="请选择渠道">
+                    <el-option
+                      v-for="item in dictDeviceChannel"
+                      :key="item.key"
+                      :label="item.name"
+                      :value="item.key">
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+              </div>
+              <div class="item">
+                <el-form-item label="系列" prop="deviceSeries">
+                  <el-select :disabled="isViewMode" v-model="ruleForm.deviceSeries" size="small" clearable filterable placeholder="请选择系列">
+                    <el-option
+                      v-for="item in dictDeviceSeries"
+                      :key="item.key"
+                      :label="item.name"
+                      :value="item.key">
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="设备类型" prop="deviceType">
+                  <!-- <div style="display: flex; align-items: center;height:40px">
+                    <el-radio v-model="ruleForm.deviceType" label="1">正式</el-radio>
+                    <el-radio v-model="ruleForm.deviceType" label="2">非正式</el-radio>
+                  </div> -->
+                  <el-radio-group :disabled="isViewMode" v-model="ruleForm.deviceType">
+                    <el-radio 
+                      v-for="item in dictDeviceType"
+                      :key="item.key"
+                      :label="item.name"
+                      :value="item.key"
+                      >
+                    </el-radio>
+                  </el-radio-group>
+                </el-form-item>
+              </div>
+              <div class="item">
+                <el-form-item label="型号" prop="deviceModel">
+                  <el-select :disabled="isViewMode" v-model="ruleForm.deviceModel" size="small" clearable filterable placeholder="请选择型号">
+                    <el-option
+                      v-for="item in dictDeviceModel"
+                      :key="item.key"
+                      :label="item.name"
+                      :value="item.key">
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="备注信息">
+                  <el-input
+                    class="el-input"
+                    maxlength="20"
+                    size="small"
+                    placeholder="请输入备注信息"
+                    v-model="ruleForm.remark"
+                    :disabled="isViewMode"
+                    clearable>
+                  </el-input>
+                </el-form-item>
+              </div>
+              <div class="item">
+                <el-form-item label="批量数量">
+                  <el-input-number :disabled="isViewMode" class="el-input-number" v-model="deviceBatchNum" size="small" controls-position="right" @change="handleChange" :min="0" :max="100"></el-input-number>
+                </el-form-item>
+              </div>
+            </el-form>
+          </div>
+          <el-row v-if="!isViewMode">
+            <el-button size="small" type="primary" :disabled="isViewMode|| (ruleForm.hardwareCode && ruleForm.hardwareCode.length > 0)" @click="generateHardwareCode('ruleForm')">生成硬件编码</el-button>
+            <el-button size="small" type="primary" :disabled="isViewMode|| (ruleForm.hardwareCode && ruleForm.hardwareCode.length > 0)" @click="batchGenerateHardwareCode('ruleForm')">批量生成硬件编码</el-button>
+            <div style="color:red;margin-top:10px;font-size:14px">注:只有设备基础信息全部录入成功才可以生成硬件编码;批量生成须填写批量数量</div>
+          </el-row>
+        </el-collapse-item>
+        <el-collapse-item title="硬件编码信息" name="2">
+          <div class="item hardware-code-container">
+            <span>硬件编码:</span>
+            <div class="hardware-code-list">
+              <div v-for="(item, index) in ruleForm.hardwareCode" :key="index" class="hardware-code-item">
+                <el-input
+                  class="hardware-code-input"
+                  size="small"
+                  v-model="ruleForm.hardwareCode[index]"
+                  :disabled="true">
+                </el-input>
+              </div>
+            </div>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
+      <div slot="footer" class="dialog-footer" v-if="!isViewMode">
+        <el-button @click="dialogFormVisible = false">取 消</el-button>
+        <el-button type="primary" @click="submitDeviceForm('ruleForm')">确 定</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- <AddDeviceDialog :visible.sync="addDeviceDialogVisible" :agent-id="currentAgentId"
       @refresh="fetchBindDevices(currentAgentId)" />
     <ManualAddDeviceDialog :visible.sync="manualAddDeviceDialogVisible" :agent-id="currentAgentId"
-      @refresh="fetchBindDevices(currentAgentId)" />
+      @refresh="fetchBindDevices(currentAgentId)" /> -->
 
   </div>
 </template>
@@ -144,35 +306,66 @@ export default {
       pageSize: 10,
       pageSizeOptions: [10, 20, 50, 100],
       deviceList: [],
+      total:0,
       loading: false,
       userApi: null,
       firmwareTypes: [],
+      dialogFormVisible:false,
+      activeNames: ['1'],
+      dictDeviceBrand: [],
+      dictDeviceChannel: [],
+      dictDeviceModel: [],
+      dictDeviceSeries: [],
+      dictDeviceType:[],
+      ruleForm:{
+        // roleName:'',  //角色
+        ssid:'', //设备ssid
+        deviceBrand:'',  //品牌
+        deviceChannel:'',  //渠道
+        deviceSeries:'',  //系列
+        deviceType:'',  // 设备类型
+        deviceModel:'',  //型号
+        deviceStatus:'', //状态
+        deviceStatusName:'', //中文状态  已启用、已禁用
+        remark:'',  //备注信息
+        hardwareCode: []  //硬件编码：改为数组，统一处理单个或批量返回
+      },
+      ssids: [], // 存储生成的所有硬件编码
+      deviceBatchNum: 0,
+      isViewMode:false,
+      rules:{
+        // roleName:[
+        //   {required: true, message: '请选择角色', trigger: 'change'}
+        // ],
+        deviceBrand:[
+          {required: true, message: '请选择品牌', trigger: 'change'}
+        ],
+        deviceChannel:[
+          {required: true, message: '请选择渠道', trigger: 'change'}
+        ],
+        deviceSeries:[
+          {required: true, message: '请选择系列', trigger: 'change'}
+        ],
+        deviceType:[
+          {required: true, message: '请至少选择一个设备类型', trigger: 'change'}
+        ],
+        deviceModel:[
+          {required: true, message: '请选择型号', trigger: 'change'}
+        ]
+      }
     };
   },
   computed: {
-    filteredDeviceList() {
-      const keyword = this.activeSearchKeyword.toLowerCase();
-      if (!keyword) return this.deviceList;
-      return this.deviceList.filter(device =>
-        (device.model && device.model.toLowerCase().includes(keyword)) ||
-        (device.macAddress && device.macAddress.toLowerCase().includes(keyword))
-      );
-    },
-
-    paginatedDeviceList() {
-      const start = (this.currentPage - 1) * this.pageSize;
-      const end = start + this.pageSize;
-      return this.filteredDeviceList.slice(start, end);
+    // pageCount() {
+    //   return Math.ceil(this.filteredDeviceList.length / this.pageSize);
+    // },
+    dialogTitle(){
+      return this.isViewMode ?'查看设备':'添加设备';
     },
     pageCount() {
-      return Math.ceil(this.filteredDeviceList.length / this.pageSize);
+      return Math.ceil((Number(this.total) || 0) / this.pageSize);
     },
-    // 计算当前页是否全选
-    isCurrentPageAllSelected() {
-      return this.paginatedDeviceList.length > 0 &&
-        this.paginatedDeviceList.every(device => device.selected);
-    },
-    visiblePages() {
+     visiblePages() {
       const pages = [];
       const maxVisible = 3;
       let start = Math.max(1, this.currentPage - 1);
@@ -187,17 +380,83 @@ export default {
       }
       return pages;
     },
+    filteredDeviceList() {
+      const keyword = (this.activeSearchKeyword || '').toLowerCase();
+      if (!keyword) return this.deviceList;
+      // 根据 fetchParams 返回的字段调整搜索字段：ssid / deviceModel / deviceBrand
+      return this.deviceList.filter(device =>
+        (device.ssid && String(device.ssid).toLowerCase().includes(keyword)) ||
+        (device.deviceModel && String(device.deviceModel).toLowerCase().includes(keyword)) ||
+        (device.deviceBrand && String(device.deviceBrand).toLowerCase().includes(keyword))
+      );
+    },
+
+    paginatedDeviceList() {
+      return this.filteredDeviceList;
+    },
+    
+    // 计算当前页是否全选
+    isCurrentPageAllSelected() {
+      return this.paginatedDeviceList.length > 0 &&
+        this.paginatedDeviceList.every(device => device.selected);
+    },
   },
   mounted() {
     const agentId = this.$route.query.agentId;
-    if (agentId) {
-      this.fetchBindDevices(agentId);
-    }
+    // if (agentId) {
+    //   this.fetchBindDevices(agentId);
+    // }
+    this.fetchParams();
   },
   created() {
     this.getFirmwareTypes()
+    this.getDeviceBrand()
+    this.getDeviceChannel()
+    this.getDeviceModel()
+    this.getDeviceSeries()
+    this.getDeviceType()
   },
   methods: {
+    async getDeviceBrand() {
+      try {
+        const res = await Api.dict.getDictDataByType('device_brand')
+        this.dictDeviceBrand = res.data
+      } catch (error) {
+        this.$message.error(error.message || '获取品牌字典数据失败')
+      }
+    },
+    async getDeviceChannel() {
+      try {
+        const res = await Api.dict.getDictDataByType('device_channel')
+        this.dictDeviceChannel = res.data
+      } catch (error) {
+        this.$message.error(error.message || '获取渠道字典数据失败')
+      }
+    },
+    async getDeviceModel() {
+      try {
+        const res = await Api.dict.getDictDataByType('device_model')
+        this.dictDeviceModel = res.data
+      } catch (error) {
+        this.$message.error(error.message || '获取型号字典数据失败')
+      }
+    },
+    async getDeviceSeries() {
+      try {
+        const res = await Api.dict.getDictDataByType('device_series')
+        this.dictDeviceSeries = res.data
+      } catch (error) {
+        this.$message.error(error.message || '获取系列字典数据失败')
+      }
+    },
+    async getDeviceType() {
+      try {
+        const res = await Api.dict.getDictDataByType('device_type')
+        this.dictDeviceType = res.data
+      } catch (error) {
+        this.$message.error(error.message || '获取类型字典数据失败')
+      }
+    },
     async getFirmwareTypes() {
       try {
         const res = await Api.dict.getDictDataByType('FIRMWARE_TYPE')
@@ -207,10 +466,325 @@ export default {
         this.$message.error(error.message || this.$t('device.getFirmwareTypeFailed'))
       }
     },
+    // 批量开启、禁用
+    handleBatchEnable(bool){
+      const selectedSsids = this.paginatedDeviceList
+				.filter(d => d.selected)
+				.map(d => d.ssid)
+				.filter(Boolean);
+      console.log('selectedSsids',selectedSsids)
+			if (selectedSsids.length === 0) {
+				this.$message.warning({
+					message: '请至少选择一条记录',
+					showClose: true
+				});
+				return;
+			}
+      let str = `enable=${bool}`
+      str += `&ssids=${String(selectedSsids)}`
+      Api.device.devicebatchEnable(str,({data})=>{
+        if(data.code ===0){
+          this.$message({
+            message: bool ? '启用成功' : '禁用成功',
+            type: 'success'
+          });
+          this.fetchParams(this.page)
+        }else{
+          this.$message.error({
+							message: (data && data.msg)|| bool ? '启用失败':'禁用失败',
+							showClose: true
+					});
+          this.fetchParams(this.page)
+        }
+      })
+    },
+    // 启用禁用切换
+    handleEnable(row){
+      let enable = row.deviceStatus == 0? false:true
+      let str = `enable=${enable = row.deviceStatus == 0? false:true}`
+      str += `&ssids=${String(row.ssid)}`
+      Api.device.devicebatchEnable(str,({data})=>{
+        if(data.code ===0){
+          this.$message({
+            message: enable ? '启用成功' : '禁用成功',
+            type: 'success'
+          });
+          this.fetchParams(this.page)
+        }else{
+          this.$message.error({
+							message: (data && data.msg) || enable ? '启用成功' : '禁用成功',
+							showClose: true
+					});
+          this.fetchParams(this.page)
+        }
+      })
+    },
+    // 生成单个硬件编码
+    generateHardwareCode(formName) {
+      if (this.ruleForm.hardwareCode && this.ruleForm.hardwareCode.length > 0) {
+        this.$message.info('已生成硬件编码，无法重复生成')
+        return
+      }
+      this.$refs[formName].validate((valid) => {
+        if (valid) {
+          const selectedLabel = this.ruleForm.deviceType;
+          let mappedKeys = [];
+          if (Array.isArray(selectedLabel)) {
+            mappedKeys = selectedLabel.map(l => {
+              const f = this.dictDeviceType.find(d => d.name === l);
+              return f ? f.key : null;
+            }).filter(Boolean);
+          } else {
+            const f = this.dictDeviceType.find(d => d.name === selectedLabel);
+            if (f) mappedKeys = [f.key];
+          }
+          if (mappedKeys.length) {
+            this.ruleForm.deviceType = mappedKeys[0];
+          }
+          const agentId = this.currentAgentId
+          const deviceBatchNum = this.deviceBatchNum
+          const params ={...this.ruleForm,agentId,deviceBatchNum}
+          Api.device.getDeviceCode(params,({data})=>{
+            if(data.code === 0){
+              const codes = Array.isArray(data.data) ? data.data : [data.data];
+              this.ruleForm.hardwareCode = codes;
+              this.ssids = codes;
+              this.$message.success('硬件编码生成成功')
+            }else{
+              this.$message.error('生成设备编码失败')
+            }
+          })
+        }else{
+          this.$message.error('请填写设备的基础信息')
+          return
+        }
+      });
+    },
+    // 批量生成硬件编码
+    batchGenerateHardwareCode(formName) {
+      if (this.ruleForm.hardwareCode && this.ruleForm.hardwareCode.length > 0) {
+        this.$message.info('已生成硬件编码，无法重复生成')
+        return
+      }
+      this.$refs[formName].validate((valid) => {
+        if (valid) {
+          if (this.deviceBatchNum <= 0 || this.deviceBatchNum > 100) {
+            this.$message.warning('请输入有效的批量数量（1-100）')
+            return
+          }
+          const selectedLabel = this.ruleForm.deviceType;
+          let mappedKeys = [];
+          if (Array.isArray(selectedLabel)) {
+            mappedKeys = selectedLabel.map(l => {
+              const f = this.dictDeviceType.find(d => d.name === l);
+              return f ? f.key : null;
+            }).filter(Boolean);
+          } else {
+            const f = this.dictDeviceType.find(d => d.name === selectedLabel);
+            if (f) mappedKeys = [f.key];
+          }
+          if (mappedKeys.length) {
+            this.ruleForm.deviceType = mappedKeys[0];
+          }
+          const agentId = this.currentAgentId
+          const deviceBatchNum = this.deviceBatchNum
+          const params ={...this.ruleForm,agentId,deviceBatchNum}
+          Api.device.getBatchDeviceCode(params,({data})=>{
+            if(data.code === 0){
+              const codes = Array.isArray(data.data) ? data.data : [data.data];
+              this.ruleForm.hardwareCode = codes;
+              this.ssids = codes;
+               this.$message.success('批量生成硬件编码成功')
+            }else{
+              this.$message.error('批量生成设备编码失败')
+            }
+          })
+        }else{
+          this.$message.error('请填写设备的基础信息')
+          return
+        }
+      });
+    },
+    // 提交设备表单
+    submitDeviceForm(formName) {
+      if (this.isViewMode) {
+        this.dialogFormVisible = false
+        return
+      }
+      this.$refs[formName].validate((valid) => {
+        if (valid) {
+          if (!this.ruleForm.hardwareCode || this.ruleForm.hardwareCode.length === 0) {
+            this.$message.warning('请先生成硬件编码')
+            return
+          }
+          const agentId = this.currentAgentId
+          const deviceBatchNum = this.deviceBatchNum
+          const ssids = this.ssids
+          const params ={...this.ruleForm,agentId,deviceBatchNum,ssids}
+          Api.device.addBindDevice(params,({data})=>{
+            if(data.code === 0){
+              this.$message.success('设备添加成功')
+              this.dialogFormVisible = false
+              this.fetchParams()
+            }else{
+              this.$message.error('设备添加失败')
+            }
+          })
+        }else{
+          this.$message.error('请填写设备的基础信息')
+          return
+        }
+      });
+    },
+    deviceDelete(ssids) {
+      this.$confirm('是否确认删除此数据?', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        const params = Array.isArray(ssids)?ssids:[ssids]
+        Api.device.newDeleteDevice(params,({data})=>{
+          if(data.code ===0){
+            this.$message({
+            type: 'success',
+            message: '删除成功!'
+            });
+            this.fetchParams()
+          }
+        })
+        
+      }).catch(() => {
+        this.$message({
+          type: 'info',
+          message: '已取消删除'
+        });          
+      });
+    },
+    deviceView(ssid){
+      const params = String(ssid)
+      Api.device.getDeviceDetail(params,({data})=>{
+        if(data.code ===0){
+          this.ruleForm = data.data
+          this.ruleForm.hardwareCode = [data.data.ssid]
+          this.ruleForm.deviceType = data.data.deviceTypeName
+          this.isViewMode = true
+          this.dialogFormVisible = true
+        }else{
+          this.$message.error('获取详情失败')
+        }
+      })
+    },
+    deviceAdd(){
+      this.isViewMode = false
+      this.dialogFormVisible = true
+      // 重置表单数据
+      this.ruleForm = {
+        roleName:'',
+        deviceBrand:'',
+        deviceChannel:'',
+        deviceSeries:'',
+        deviceType:null,
+        deviceModel:'',
+        deviceStatusName:'',
+        remark:'',
+        hardwareCode: []
+      }
+      this.ssids = []
+      this.deviceBatchNum=0
+       // 清除上次的校验提示（避免打开对话框时立即显示必填错误）
+      this.$nextTick(() => {
+        if (this.$refs.ruleForm && this.$refs.ruleForm.clearValidate) {
+          this.$refs.ruleForm.clearValidate();
+        }
+      });
+    },
     handlePageSizeChange(val) {
       this.pageSize = val;
       this.currentPage = 1;
+      this.fetchParams()
     },
+    fetchParams(){
+      this.loading = true;
+      const agentId = this.currentAgentId;
+      Api.device.getNewListData(
+        {
+            page: this.currentPage,
+            limit: this.pageSize,
+            agentId:agentId
+        },
+        ({ data }) => {
+          this.loading = false;
+          console.log('列表',data)
+          if (data.code === 0) {
+              this.deviceList = data.data.list.map(device => ({
+                  createDate:device.createDate,
+                  updateDate:device.updateDate,
+                  deviceBrand:device.deviceBrandName,
+                  deviceChannel:device.deviceChannelName,
+                  deviceSeries:device.deviceSeriesName,
+                  deviceType:device.deviceTypeName,
+                  deviceModel:device.deviceModelName,
+                  deviceStatusName:device.deviceStatusName,
+                  deviceStatus:device.deviceStatus,
+                  remark:device.remark||'无',
+                  ssid:device.ssid,
+                  selected: false,
+                  showValue: false
+              }));
+              this.total = data.data.total;
+          } else {
+              this.$message.error({
+                  message: data.msg,
+                  showClose: true
+              });
+          }
+        }
+      );
+    },
+    // fetchBindDevices(agentId) {
+    //   this.loading = true;
+    //   Api.device.getAgentBindDevices(agentId, ({ data }) => {
+    //     this.loading = false;
+    //     console.log('data',data)
+    //     if (data.code === 0) {
+    //       this.deviceList = data.data.map(device => {
+    //         return {
+    //           device_id: device.id,
+    //           model: device.board,
+    //           firmwareVersion: device.appVersion,
+    //           macAddress: device.macAddress,
+    //           bindTime: device.createDate,
+    //           lastConversation: device.lastConnectedAt,
+    //           remark: device.alias,
+    //           _originalRemark: device.alias,
+    //           isEdit: false,
+    //           _submitting: false,
+    //           otaSwitch: device.autoUpdate === 1,
+    //           rawBindTime: new Date(device.createDate).getTime(),
+    //           selected: false,
+    //           // 初始设置为离线状态
+    //           deviceStatus: 'offline',
+    //           createDate:device.createDate,
+    //           updateDate:device.updateDate,
+    //           deviceBrand:device.deviceBrand,
+    //           deviceChannel:device.deviceChannel,
+    //           deviceSeries:device.deviceSeries,
+    //           deviceType:device.deviceType,
+    //           deviceModel:device.deviceModel,
+    //           ssid:device.ssid
+    //         };
+    //       })
+    //         // .sort((a, b) => a.rawBindTime - b.rawBindTime);
+    //       this.activeSearchKeyword = "";
+    //       this.searchKeyword = "";
+
+    //       // 获取设备列表后，立即获取设备状态
+    //       this.fetchDeviceStatus(agentId);
+    //     } else {
+    //       this.$message.error(data.msg || this.$t('device.getListFailed'));
+    //     }
+    //   });
+    // },
     handleSearch() {
       this.activeSearchKeyword = this.searchKeyword;
       this.currentPage = 1;
@@ -232,7 +806,6 @@ export default {
         });
         return;
       }
-
       this.$confirm(this.$t('device.confirmBatchUnbind').replace('{count}', selectedDevices.length), this.$t('message.warning'), {
         confirmButtonText: this.$t('button.ok'),
         cancelButtonText: this.$t('button.cancel'),
@@ -260,7 +833,7 @@ export default {
             message: this.$t('device.batchUnbindSuccess').replace('{count}', deviceIds.length),
             showClose: true
           });
-          this.fetchBindDevices(this.currentAgentId);
+          // this.fetchBindDevices(this.currentAgentId);
         })
         .catch(error => {
           this.$message.error({
@@ -277,7 +850,6 @@ export default {
     },
     submitRemark(row) {
       if (row._submitting) return;
-
       const text = (row.remark || '').trim();
       if (text.length > 64) {
         this.$message.warning(this.$t('device.remarkTooLong'));
@@ -286,7 +858,6 @@ export default {
       if (text === row._originalRemark) {
         return;
       }
-
       row._submitting = true;
       this.updateDeviceInfo(row.device_id, { alias: text }, (ok, resp) => {
         if (ok) {
@@ -323,7 +894,7 @@ export default {
               message: this.$t('device.unbindSuccess'),
               showClose: true
             });
-            this.fetchBindDevices(this.$route.query.agentId);
+            // this.fetchBindDevices(this.$route.query.agentId);
           } else {
             this.$message.error({
               message: data.msg || this.$t('device.unbindFailed'),
@@ -333,53 +904,29 @@ export default {
         });
       });
     },
+    goToPage(page) {
+        if (page !== this.currentPage) {
+            this.currentPage = page;
+            this.fetchParams();
+        }
+    },
     goFirst() {
-      this.currentPage = 1;
+        if (this.currentPage !== 1) {
+            this.currentPage = 1;
+            this.fetchParams();
+        }
     },
     goPrev() {
-      if (this.currentPage > 1) this.currentPage--;
+        if (this.currentPage > 1) {
+            this.currentPage--;
+            this.fetchParams();
+        }
     },
     goNext() {
-      if (this.currentPage < this.pageCount) this.currentPage++;
-    },
-    goToPage(page) {
-      this.currentPage = page;
-    },
-
-    fetchBindDevices(agentId) {
-      this.loading = true;
-      Api.device.getAgentBindDevices(agentId, ({ data }) => {
-        this.loading = false;
-        if (data.code === 0) {
-          this.deviceList = data.data.map(device => {
-            return {
-              device_id: device.id,
-              model: device.board,
-              firmwareVersion: device.appVersion,
-              macAddress: device.macAddress,
-              bindTime: device.createDate,
-              lastConversation: device.lastConnectedAt,
-              remark: device.alias,
-              _originalRemark: device.alias,
-              isEdit: false,
-              _submitting: false,
-              otaSwitch: device.autoUpdate === 1,
-              rawBindTime: new Date(device.createDate).getTime(),
-              selected: false,
-              // 初始设置为离线状态
-              deviceStatus: 'offline'
-            };
-          })
-            .sort((a, b) => a.rawBindTime - b.rawBindTime);
-          this.activeSearchKeyword = "";
-          this.searchKeyword = "";
-
-          // 获取设备列表后，立即获取设备状态
-          this.fetchDeviceStatus(agentId);
-        } else {
-          this.$message.error(data.msg || this.$t('device.getListFailed'));
+        if (this.currentPage < this.pageCount) {
+            this.currentPage++;
+            this.fetchParams();
         }
-      });
     },
 
     // 获取设备状态
@@ -457,11 +1004,75 @@ export default {
         this.$message.error(msg || this.$t('message.error'))
       })
     },
+    // 批量删除：收集选中行的 ssid，调用同一删除接口
+		batchDeleteDevice() {
+			const selectedSsids = this.paginatedDeviceList
+				.filter(d => d.selected)
+				.map(d => d.ssid)
+				.filter(Boolean);
+			if (selectedSsids.length === 0) {
+				this.$message.warning({
+					message: this.$t('device.selectAtLeastOne') || '请至少选择一条记录',
+					showClose: true
+				});
+				return;
+			}
+			this.$confirm(`确定要删除选中的 ${selectedSsids.length} 条设备吗？`, this.$t('message.warning') || '提示', {
+				confirmButtonText: this.$t('button.ok') || '确定',
+				cancelButtonText: this.$t('button.cancel') || '取消',
+				type: 'warning'
+			}).then(() => {
+				Api.device.newDeleteDevice(selectedSsids, ({ data }) => {
+					if (data && data.code === 0) {
+						this.$message.success({
+							message: '删除成功',
+							showClose: true
+						});
+						// 刷新当前页数据
+						this.fetchParams();
+					} else {
+						this.$message.error({
+							message: (data && data.msg) || '删除失败',
+							showClose: true
+						});
+					}
+				}, (err) => {
+					this.$message.error({
+						message: (err && err.message) || '删除失败',
+						showClose: true
+					});
+				});
+			}).catch(() => {
+				this.$message.info({
+					message: '已取消删除',
+					showClose: true
+				});
+			});
+		},
   }
 };
 </script>
 
 <style scoped>
+
+/deep/ .cell{
+  padding-left: 0px!important;
+  padding-right: 0px!important;
+}
+/deep/ .el-form-item__content{
+  text-align: left;
+}
+/deep/ .el-dialog__header{
+  text-align-last: left;
+  padding-bottom: 0px!important;
+}
+/deep/ .el-collapse-item__header{
+  font-size: 17px;
+}
+.el-input{
+  /* width: 50%!important; */
+  margin-bottom: 10px
+}
 .welcome {
   min-width: 900px;
   min-height: 506px;
@@ -508,7 +1119,7 @@ export default {
 }
 
 .search-input {
-  width: 280px;
+  width: 280px!important;
   border-radius: 4px;
 }
 
@@ -516,6 +1127,7 @@ export default {
   background: linear-gradient(135deg, #6b8cff, #a966ff);
   border: none;
   color: white;
+  height: 40px;
 }
 
 ::v-deep .search-input .el-input__inner {
@@ -526,7 +1138,7 @@ export default {
 }
 
 ::v-deep .page-size-select {
-  width: 100px;
+  width: 100px!important;
   margin-right: 8px;
 }
 
@@ -674,7 +1286,7 @@ export default {
 .custom-pagination .pagination-btn:nth-child(2),
 .custom-pagination .pagination-btn:nth-last-child(2),
 .custom-pagination .pagination-btn:nth-child(3) {
-  min-width: 60px;
+  min-width: 70px;
   height: 32px;
   padding: 0 12px;
   border-radius: 4px;
@@ -730,7 +1342,9 @@ export default {
   font-size: 14px;
   margin-left: 10px;
 }
-
+/* .total-text{
+  width: 20px;
+} */
 :deep(.transparent-table) {
   background: white;
   border: none;
@@ -817,9 +1431,146 @@ export default {
   border-color: #5f70f3 !important;
 }
 
-::v-deep .el-table--border::after,
+:deep(.el-table--border::after,
 ::v-deep .el-table--group::after,
-::v-deep .el-table::before {
+::v-deep .el-table::before ){
   display: none !important;
+}
+
+/* 设备添加对话框样式优化 */
+.el-dialog__body {
+  padding: 20px 30px;
+}
+
+.el-collapse {
+  border: none;
+}
+
+.el-collapse-item__header {
+  font-size: 20px;
+  font-weight: 500;
+  color: #303133;
+  background-color: #f5f7fa;
+  padding: 0 20px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+.el-collapse-item__content {
+  padding: 0;
+  padding-bottom: 20px;
+}
+
+/* 表单项样式 */
+.item {
+  display: flex;
+  /* align-items: center; */
+  gap: 15px;
+}
+
+.item span {
+  min-width: 70px;
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+  text-align: right;
+}
+
+.item .span1 {
+  margin-left: 0;
+}
+
+.demo-ruleForm .el-form-item {
+  margin-bottom: 15px;
+  display: inline-block;
+  width: 48%;
+  margin-right: 2%;
+}
+
+.demo-ruleForm .el-form-item:nth-child(2n) {
+  margin-right: 0;
+}
+
+.demo-ruleForm .el-form-item__label {
+  text-align: right;
+  color: #333;
+}
+
+.demo-ruleForm .el-form-item__label:before {
+  content: "*";
+  color: #f56c6c;
+  margin-right: 4px;
+}
+
+.demo-ruleForm .el-form-item:nth-child(7) .el-form-item__label:before,
+.demo-ruleForm .el-form-item:nth-child(8) .el-form-item__label:before {
+  content: "";
+}
+
+/* 选择框和输入框样式 */
+.el-select,
+.el-input,
+.el-input-number {
+  width: 100%;
+  min-width: 0;
+}
+
+/* 单选框样式 */
+.el-radio {
+  margin-right: 20px;
+}
+
+.el-radio__label {
+  font-size: 14px;
+  color: #606266;
+}
+
+/* 按钮样式 */
+.el-row {
+  margin-top: 25px;
+  text-align: center;
+}
+
+.el-row .el-button {
+  margin: 0 10px;
+  min-width: 140px;
+  height: 36px;
+  font-size: 14px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* 对话框底部按钮 */
+.dialog-footer {
+  text-align: center;
+  padding-top: 20px;
+  /* border-top: 1px solid #e4e7ed; */
+}
+
+.dialog-footer .el-button {
+  min-width: 100px;
+  margin: 0 10px;
+  border-radius: 4px;
+}
+
+/* 硬件编码逐行显示样式（覆盖全局 .el-input 宽度 50%） */
+.hardware-code-container .hardware-code-list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.hardware-code-container .hardware-code-item {
+  margin-bottom: 8px;
+  width: 100%;
+}
+/* 更具体的选择器以覆盖全局 .el-input { width:50% !important; } */
+.hardware-code-container .hardware-code-input {
+  width: 100% !important;
+  display: block;
+}
+/* 内部输入框也保证占满 */
+.hardware-code-container .hardware-code-input >>> .el-input__inner,
+.hardware-code-container .hardware-code-input ::v-deep .el-input__inner {
+  width: 100% !important;
 }
 </style>

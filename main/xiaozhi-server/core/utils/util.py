@@ -9,9 +9,11 @@ import subprocess
 import numpy as np
 import opuslib_next
 from io import BytesIO
+from loguru import logger
 from core.utils import p3
 from pydub import AudioSegment
 from typing import Callable, Any
+from core.utils.opus_encoder_utils import OpusConfig
 
 TAG = __name__
 emoji_map = {
@@ -245,7 +247,18 @@ def extract_json_from_string(input_string):
     return None
 
 
-def audio_to_data_stream(audio_file_path, is_opus=True, callback: Callable[[Any], Any]=None) -> None:
+def audio_to_data_stream(audio_file_path, is_opus=True, callback: Callable[[Any], Any]=None, opus_config: OpusConfig = None) -> None:
+    """
+    将音频文件转换为opus/pcm数据流
+    Args:
+        audio_file_path: 音频文件路径
+        is_opus: 是否进行Opus编码
+        callback: 回调函数
+        opus_config: Opus配置对象
+    """
+    sample_rate = opus_config.sample_rate
+    channels = opus_config.channels
+
     # 获取文件后缀名
     file_type = os.path.splitext(audio_file_path)[1]
     if file_type:
@@ -255,20 +268,25 @@ def audio_to_data_stream(audio_file_path, is_opus=True, callback: Callable[[Any]
         audio_file_path, format=file_type, parameters=["-nostdin"]
     )
 
-    # 转换为单声道/16kHz采样率/16位小端编码（确保与编码器匹配）
-    audio = audio.set_channels(1).set_frame_rate(16000).set_sample_width(2)
+    # 转换为指定采样率和通道数/16位小端编码（确保与编码器匹配）
+    audio = audio.set_channels(channels).set_frame_rate(sample_rate).set_sample_width(2)
 
     # 获取原始PCM数据（16位小端）
     raw_data = audio.raw_data
-    pcm_to_data_stream(raw_data, is_opus, callback)
+    pcm_to_data_stream(raw_data, is_opus, callback, opus_config)
 
-def audio_to_data(audio_file_path: str, is_opus: bool = True) -> list[bytes]:
+def audio_to_data(audio_file_path: str, is_opus: bool = True, opus_config: OpusConfig = None) -> list[bytes]:
     """
     将音频文件转换为Opus/PCM编码的帧列表
     Args:
         audio_file_path: 音频文件路径
         is_opus: 是否进行Opus编码
+        opus_config: Opus配置对象
     """
+    sample_rate = opus_config.sample_rate
+    channels = opus_config.channels
+    frame_duration = opus_config.enc_frame_duration_ms
+
     # 获取文件后缀名
     file_type = os.path.splitext(audio_file_path)[1]
     if file_type:
@@ -278,101 +296,393 @@ def audio_to_data(audio_file_path: str, is_opus: bool = True) -> list[bytes]:
         audio_file_path, format=file_type, parameters=["-nostdin"]
     )
 
-    # 转换为单声道/16kHz采样率/16位小端编码（确保与编码器匹配）
-    audio = audio.set_channels(1).set_frame_rate(16000).set_sample_width(2)
+    # 转换为指定采样率和通道数/16位小端编码（确保与编码器匹配）
+    audio = audio.set_channels(channels).set_frame_rate(sample_rate).set_sample_width(2)
 
     # 获取原始PCM数据（16位小端）
     raw_data = audio.raw_data
 
-    # 初始化Opus编码器
-    encoder = opuslib_next.Encoder(16000, 1, opuslib_next.APPLICATION_AUDIO)
-
     # 编码参数
-    frame_duration = 60  # 60ms per frame
-    frame_size = int(16000 * frame_duration / 1000)  # 960 samples/frame
-
+    frame_size = int(sample_rate * frame_duration / 1000)  # samples/frame
+    
     datas = []
-    # 按帧处理所有音频数据（包括最后一帧可能补零）
-    for i in range(0, len(raw_data), frame_size * 2):  # 16bit=2bytes/sample
-        # 获取当前帧的二进制数据
-        chunk = raw_data[i : i + frame_size * 2]
-
-        # 如果最后一帧不足，补零
-        if len(chunk) < frame_size * 2:
-            chunk += b"\x00" * (frame_size * 2 - len(chunk))
-
-        if is_opus:
-            # 转换为numpy数组处理
-            np_frame = np.frombuffer(chunk, dtype=np.int16)
-            # 编码Opus数据
-            frame_data = encoder.encode(np_frame.tobytes(), frame_size)
+    
+    if is_opus:
+        # Opus编码：需要判断vbr
+        vbr = opus_config.vbr
+        bitrate = opus_config.bitrate
+        # 初始化Opus编码器
+        encoder = opuslib_next.Encoder(sample_rate, channels, opuslib_next.APPLICATION_AUDIO)
+        # 打印日志确认 vbr 和 frame_duration 的值
+        logger.bind(tag=TAG).debug(f"[audio_to_data] vbr={vbr}, frame_duration={frame_duration},frame_size={frame_size},audio_file_path={audio_file_path}")
+        
+        if not vbr:
+            # 固定码率模式：先将PCM数据转换为numpy数组，按样本数处理
+            pcm_stream = np.frombuffer(raw_data, dtype=np.int16)
+            # 每帧的总样本数（考虑多声道）
+            total_frame_size = frame_size * channels
+            # 设置VBR
+            encoder.vbr = vbr
+            encoder.bitrate = bitrate
+            
+            # 按帧处理所有音频数据（包括最后一帧可能补零）
+            for i in range(0, len(pcm_stream), total_frame_size):
+                # 提取当前帧
+                frame_samples = pcm_stream[i:i + total_frame_size]
+                
+                # 如果最后一帧不足，用零填充
+                if len(frame_samples) < total_frame_size:
+                    frame_samples = np.pad(frame_samples, (0, total_frame_size - len(frame_samples)), 'constant')
+                    logger.bind(tag=TAG).debug(f"最后一帧用零填充到{total_frame_size}采样点")
+                
+                # 编码当前帧
+                encoded_frame = encoder.encode(frame_samples.tobytes(), frame_size)
+                if encoded_frame is not None:
+                    # 单帧直接添加
+                    datas.append(encoded_frame)
+                else:
+                    logger.bind(tag=TAG).warning(f"第{len(datas)}帧编码失败")
         else:
-            frame_data = chunk if isinstance(chunk, bytes) else bytes(chunk)
+            # 动态码率模式：使用原有编码逻辑
+            # 按帧处理所有音频数据（包括最后一帧可能补零）
+            for i in range(0, len(raw_data), frame_size * 2):  # 16bit=2bytes/sample
+                # 获取当前帧的二进制数据
+                chunk = raw_data[i : i + frame_size * 2]
 
-        datas.append(frame_data)
+                # 如果最后一帧不足，补零
+                if len(chunk) < frame_size * 2:
+                    chunk += b"\x00" * (frame_size * 2 - len(chunk))
+
+                # 转换为numpy数组处理
+                np_frame = np.frombuffer(chunk, dtype=np.int16)
+                # 编码Opus数据
+                frame_data = encoder.encode(np_frame.tobytes(), frame_size)
+                datas.append(frame_data)
+    else:
+        # PCM模式：不需要判断vbr，直接按帧处理
+        # 按帧处理所有音频数据（包括最后一帧可能补零）
+        for i in range(0, len(raw_data), frame_size * 2):  # 16bit=2bytes/sample
+            # 获取当前帧的二进制数据
+            chunk = raw_data[i : i + frame_size * 2]
+
+            # 如果最后一帧不足，补零
+            if len(chunk) < frame_size * 2:
+                chunk += b"\x00" * (frame_size * 2 - len(chunk))
+
+            frame_data = chunk if isinstance(chunk, bytes) else bytes(chunk)
+            datas.append(frame_data)
 
     return datas
 
-def audio_bytes_to_data_stream(audio_bytes, file_type, is_opus, callback: Callable[[Any], Any]) -> None:
+def audio_bytes_to_data_stream(audio_bytes, file_type, is_opus, callback: Callable[[Any], Any], opus_config: OpusConfig = None) -> None:
     """
     直接用音频二进制数据转为opus/pcm数据，支持wav、mp3、p3
+    Args:
+        audio_bytes: 音频二进制数据
+        file_type: 音频文件类型
+        is_opus: 是否进行Opus编码
+        callback: 回调函数
+        opus_config: Opus配置对象
     """
     if file_type == "p3":
         # 直接用p3解码
         return p3.decode_opus_from_bytes_stream(audio_bytes, callback)
     else:
+        sample_rate = opus_config.sample_rate
+        channels = opus_config.channels
+
         # 其他格式用pydub
         audio = AudioSegment.from_file(
             BytesIO(audio_bytes), format=file_type, parameters=["-nostdin"]
         )
-        audio = audio.set_channels(1).set_frame_rate(16000).set_sample_width(2)
+        audio = audio.set_channels(channels).set_frame_rate(sample_rate).set_sample_width(2)
         raw_data = audio.raw_data
-        pcm_to_data_stream(raw_data, is_opus, callback)
+        pcm_to_data_stream(raw_data, is_opus, callback, opus_config)
 
 
-def pcm_to_data_stream(raw_data, is_opus=True, callback: Callable[[Any], Any] = None):
-    # 初始化Opus编码器
-    encoder = opuslib_next.Encoder(16000, 1, opuslib_next.APPLICATION_AUDIO)
+def pcm_to_data_stream(raw_data, is_opus=True, callback: Callable[[Any], Any] = None, opus_config: OpusConfig = None):
+    """
+    将PCM原始数据转换为opus/pcm数据流
+    Args:
+        raw_data: PCM原始数据
+        is_opus: 是否进行Opus编码
+        callback: 回调函数
+        opus_config: Opus配置对象
+    """
+    sample_rate = opus_config.sample_rate
+    channels = opus_config.channels
+    frame_duration = opus_config.enc_frame_duration_ms
 
     # 编码参数
-    frame_duration = 60  # 60ms per frame
-    frame_size = int(16000 * frame_duration / 1000)  # 960 samples/frame
+    frame_size = int(sample_rate * frame_duration / 1000)  # samples/frame
 
-    # 按帧处理所有音频数据（包括最后一帧可能补零）
-    for i in range(0, len(raw_data), frame_size * 2):  # 16bit=2bytes/sample
-        # 获取当前帧的二进制数据
-        chunk = raw_data[i : i + frame_size * 2]
-
-        # 如果最后一帧不足，补零
-        if len(chunk) < frame_size * 2:
-            chunk += b"\x00" * (frame_size * 2 - len(chunk))
-
-        if is_opus:
-            # 转换为numpy数组处理
-            np_frame = np.frombuffer(chunk, dtype=np.int16)
-            # 编码Opus数据
-            frame_data = encoder.encode(np_frame.tobytes(), frame_size)
-            callback(frame_data)
+    if is_opus:
+        # Opus编码：需要判断vbr
+        vbr = opus_config.vbr
+        bitrate = opus_config.bitrate
+        # 初始化Opus编码器
+        encoder = opuslib_next.Encoder(sample_rate, channels, opuslib_next.APPLICATION_AUDIO)
+        # 打印日志确认 vbr 和 frame_duration 的值
+        logger.bind(tag=TAG).debug(f"[pcm_to_data_stream] vbr={vbr}, frame_duration={frame_duration},frame_size={frame_size}")
+        
+        if not vbr:
+            # 固定码率模式：先将PCM数据转换为numpy数组，按样本数处理
+            pcm_stream = np.frombuffer(raw_data, dtype=np.int16)
+            # 每帧的总样本数（考虑多声道）
+            total_frame_size = frame_size * channels
+            # 设置VBR
+            encoder.vbr = vbr
+            encoder.bitrate = bitrate
+            
+            # 按帧处理所有音频数据（包括最后一帧可能补零）
+            successful_frames = 0
+            for i in range(0, len(pcm_stream), total_frame_size):
+                # 提取当前帧
+                frame_samples = pcm_stream[i:i + total_frame_size]
+                
+                # 如果最后一帧不足，用零填充
+                if len(frame_samples) < total_frame_size:
+                    frame_samples = np.pad(frame_samples, (0, total_frame_size - len(frame_samples)), 'constant')
+                    logger.bind(tag=TAG).debug(f"最后一帧用零填充到{total_frame_size}采样点")
+                
+                # 编码当前帧
+                encoded_frame = encoder.encode(frame_samples.tobytes(), frame_size)
+                if encoded_frame is not None:
+                    # 单帧直接回调
+                    callback(encoded_frame)
+                    successful_frames += 1
+                else:
+                    logger.bind(tag=TAG).warning(f"第{successful_frames}帧编码失败")
         else:
+            # 动态码率模式：使用原有编码逻辑
+            # 按帧处理所有音频数据（包括最后一帧可能补零）
+            for i in range(0, len(raw_data), frame_size * 2):  # 16bit=2bytes/sample
+                # 获取当前帧的二进制数据
+                chunk = raw_data[i : i + frame_size * 2]
+
+                # 如果最后一帧不足，补零
+                if len(chunk) < frame_size * 2:
+                    chunk += b"\x00" * (frame_size * 2 - len(chunk))
+
+                # 转换为numpy数组处理
+                np_frame = np.frombuffer(chunk, dtype=np.int16)
+                # 编码Opus数据
+                frame_data = encoder.encode(np_frame.tobytes(), frame_size)
+                callback(frame_data)
+    else:
+        # PCM模式：不需要判断vbr，直接按帧处理
+        # 按帧处理所有音频数据（包括最后一帧可能补零）
+        for i in range(0, len(raw_data), frame_size * 2):  # 16bit=2bytes/sample
+            # 获取当前帧的二进制数据
+            chunk = raw_data[i : i + frame_size * 2]
+
+            # 如果最后一帧不足，补零
+            if len(chunk) < frame_size * 2:
+                chunk += b"\x00" * (frame_size * 2 - len(chunk))
+
             frame_data = chunk if isinstance(chunk, bytes) else bytes(chunk)
             callback(frame_data)
 
-def opus_datas_to_wav_bytes(opus_datas, sample_rate=16000, channels=1):
+def decode_opus_to_pcm(opus_data: list, config: OpusConfig = None, target_sample_rate: int = 16000, target_channels: int = 1) -> list[bytes]:
+    """将Opus音频数据解码为PCM数据，并可选地进行重采样和通道转换
+    
+    Args:
+        opus_data: Opus音频数据列表
+        config: Opus配置对象，如果为None则使用默认配置 (16000Hz, 1通道, 20ms帧)
+        target_sample_rate: 目标采样率，默认16000Hz（ASR模型标准输入）
+        target_channels: 目标通道数，默认1（单声道，ASR模型标准输入）
+    
+    Returns:
+        PCM数据列表（已转换为目标采样率和通道数）
+    """
+    try:
+        # 如果没有提供config，使用默认配置
+        if config is None:
+            config = OpusConfig()
+        
+        # 使用config中的参数动态构建解码器
+        decoder = opuslib_next.Decoder(config.sample_rate, config.channels)
+        pcm_data = []
+        # buffer_size应该是PCM样本数，不是字节数
+        buffer_size = config.sample_points  # 使用config中的sample_points（样本数）
+        
+        # 根据vbr配置选择解码方式
+        if config.vbr:
+            # VBR模式：逐个数据包解码
+            for i, opus_packet in enumerate(opus_data):
+                try:
+                    if not opus_packet or len(opus_packet) == 0:
+                        continue
+                    
+                    pcm_frame = decoder.decode(opus_packet, buffer_size)
+                    if pcm_frame and len(pcm_frame) > 0:
+                        pcm_data.append(pcm_frame)
+                        
+                except opuslib_next.OpusError as e:
+                    logger.bind(tag=TAG).warning(f"Opus解码错误，跳过数据包 {i}: {e}")
+                except Exception as e:
+                    logger.bind(tag=TAG).error(f"音频处理错误，数据包 {i}: {e}")
+        else:
+            # CBR模式：固定字节数解析
+            # 合并所有opus数据包
+            opus_stream = b"".join(opus_data)
+            
+            if not opus_stream:
+                logger.bind(tag=TAG).warning("输入数据流为空")
+                return []
+            
+            # 计算每帧字节数
+            frame_size_bytes = config.frame_size
+            num_frames = len(opus_stream) // frame_size_bytes
+            
+            if len(opus_stream) % frame_size_bytes != 0:
+                logger.bind(tag=TAG).warning(f"数据流大小不是{frame_size_bytes}字节的整数倍，最后一帧可能不完整")
+            
+            logger.bind(tag=TAG).debug(f"总帧数: {num_frames}")
+            
+            # 解码所有帧
+            successful_frames = 0
+            
+            for frame_idx in range(num_frames):
+                start_byte = frame_idx * frame_size_bytes
+                end_byte = start_byte + frame_size_bytes
+                
+                # 提取当前帧的数据
+                frame_data = opus_stream[start_byte:end_byte]
+                
+                # 解码当前帧
+                try:
+                    pcm_frame = decoder.decode(frame_data, buffer_size)
+                    if pcm_frame and len(pcm_frame) > 0:
+                        pcm_data.append(pcm_frame)
+                        successful_frames += 1
+                    else:
+                        logger.bind(tag=TAG).warning(f"第{frame_idx}帧解码失败")
+                except opuslib_next.OpusError as e:
+                    logger.bind(tag=TAG).warning(f"第{frame_idx}帧Opus解码错误: {e}")
+                except Exception as e:
+                    logger.bind(tag=TAG).error(f"第{frame_idx}帧音频处理错误: {e}")
+            
+            if not pcm_data:
+                logger.bind(tag=TAG).error("没有成功解码任何帧")
+                return []
+            
+            logger.bind(tag=TAG).debug(f"成功解码帧数: {successful_frames}/{num_frames}")
+        
+        # 检查是否需要进行重采样或通道转换
+        need_resample = config.sample_rate != target_sample_rate
+        need_channel_convert = config.channels != target_channels
+        
+        if need_resample or need_channel_convert:
+            pcm_data = _convert_pcm_format(
+                pcm_data, 
+                src_sample_rate=config.sample_rate, 
+                src_channels=config.channels,
+                target_sample_rate=target_sample_rate,
+                target_channels=target_channels
+            )
+        
+        return pcm_data
+        
+    except Exception as e:
+        logger.bind(tag=TAG).error(f"音频解码过程发生错误: {e}")
+        return []
+
+
+def _convert_pcm_format(pcm_data: list[bytes], src_sample_rate: int, src_channels: int, 
+                        target_sample_rate: int, target_channels: int) -> list[bytes]:
+    """将PCM数据从源格式转换为目标格式（重采样和通道转换）
+    
+    Args:
+        pcm_data: PCM数据列表
+        src_sample_rate: 源采样率
+        src_channels: 源通道数
+        target_sample_rate: 目标采样率
+        target_channels: 目标通道数
+    
+    Returns:
+        转换后的PCM数据列表
+    """
+    try:
+        # 合并所有PCM数据
+        combined_pcm = b"".join(pcm_data)
+        if not combined_pcm:
+            return []
+        
+        # 转换为numpy数组（16位有符号整数）
+        audio_array = np.frombuffer(combined_pcm, dtype=np.int16)
+        
+        # 通道转换：如果源是多通道，目标是单通道
+        if src_channels > 1 and target_channels == 1:
+            # 将交错的多通道数据reshape为(samples, channels)
+            audio_array = audio_array.reshape(-1, src_channels)
+            # 取所有通道的平均值转为单声道
+            audio_array = audio_array.mean(axis=1).astype(np.int16)
+        elif src_channels == 1 and target_channels > 1:
+            # 单声道转多声道：复制到每个通道
+            audio_array = np.tile(audio_array.reshape(-1, 1), (1, target_channels)).flatten()
+        
+        # 重采样
+        if src_sample_rate != target_sample_rate:
+            # 计算重采样后的样本数
+            num_samples = len(audio_array)
+            new_num_samples = int(num_samples * target_sample_rate / src_sample_rate)
+            
+            # 使用numpy的线性插值进行重采样
+            x_old = np.linspace(0, 1, num_samples)
+            x_new = np.linspace(0, 1, new_num_samples)
+            audio_array = np.interp(x_new, x_old, audio_array.astype(np.float32)).astype(np.int16)
+        
+        # 转换回bytes
+        converted_pcm = audio_array.tobytes()
+        
+        logger.bind(tag=TAG).debug(
+            f"PCM格式转换完成: {src_sample_rate}Hz/{src_channels}ch -> {target_sample_rate}Hz/{target_channels}ch"
+        )
+        
+        return [converted_pcm]
+        
+    except Exception as e:
+        logger.bind(tag=TAG).error(f"PCM格式转换失败: {e}")
+        return pcm_data  # 转换失败时返回原始数据
+
+
+def opus_datas_to_wav_bytes(opus_datas, sample_rate=16000, channels=1, opus_config: OpusConfig = None):
     """
     将opus帧列表解码为wav字节流
+    
+    Args:
+        opus_datas: Opus音频数据列表
+        sample_rate: 采样率（仅在opus_config为None时使用）
+        channels: 通道数（仅在opus_config为None时使用）
+        opus_config: Opus配置对象，如果提供则优先使用
+    
+    Returns:
+        WAV格式的音频字节流
     """
-    decoder = opuslib_next.Decoder(sample_rate, channels)
-    pcm_datas = []
+    # 如果提供了opus_config，使用新的解码方式
+    if opus_config is not None:
+        pcm_datas = decode_opus_to_pcm(opus_datas, opus_config)
+        if not pcm_datas:
+            raise ValueError("没有有效的PCM数据")
+        
+        pcm_bytes = b"".join(pcm_datas)
+        sample_rate = opus_config.sample_rate
+        channels = opus_config.channels
+    else:
+        # 兼容旧的解码方式（不使用OpusConfig）
+        decoder = opuslib_next.Decoder(sample_rate, channels)
+        pcm_datas = []
 
-    frame_duration = 60  # ms
-    frame_size = int(sample_rate * frame_duration / 1000)  # 960
+        frame_duration = 60  # ms
+        frame_size = int(sample_rate * frame_duration / 1000)  # 960
 
-    for opus_frame in opus_datas:
-        # 解码为PCM（返回bytes，2字节/采样点）
-        pcm = decoder.decode(opus_frame, frame_size)
-        pcm_datas.append(pcm)
+        for opus_frame in opus_datas:
+            # 解码为PCM（返回bytes，2字节/采样点）
+            pcm = decoder.decode(opus_frame, frame_size)
+            pcm_datas.append(pcm)
 
-    pcm_bytes = b"".join(pcm_datas)
+        pcm_bytes = b"".join(pcm_datas)
 
     # 写入wav字节流
     wav_buffer = BytesIO()
@@ -540,3 +850,26 @@ def validate_mcp_endpoint(mcp_endpoint: str) -> bool:
         return False
 
     return True
+
+
+def transform_device_id(device_id: str, device_type: str = "0") -> str:
+    """
+    转换 device-id
+    根据 device-type 对 device-id 进行转换
+    
+    Args:
+        device_id: 原始设备ID
+        device_type: 设备类型，默认为 "0"
+        
+    Returns:
+        str: 转换后的设备ID
+    """
+    if not device_id:
+        return device_id
+    
+    # 如果 device-type 为 1，则将 device-id 暂时改成 1234567
+    if device_type == "1":
+        return "1234567"
+    
+    # 默认情况下返回原始值
+    return device_id

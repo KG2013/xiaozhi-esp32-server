@@ -59,7 +59,7 @@ class OTAHandler(BaseHandler):
         if "你的" not in websocket_config:
             return websocket_config
         else:
-            return f"ws://{local_ip}:{port}/xiaozhi/v1/"
+            return f"ws://{local_ip}:{port}/smhs/v1/"
 
     async def handle_post(self, request):
         """处理 OTA POST 请求"""
@@ -84,7 +84,7 @@ class OTAHandler(BaseHandler):
             data_json = json.loads(data)
 
             server_config = self.config["server"]
-            port = int(server_config.get("port", 8000))
+            port = int(server_config.get("port", 18000))
             local_ip = get_local_ip()
 
             return_json = {
@@ -187,7 +187,7 @@ class OTAHandler(BaseHandler):
         try:
             server_config = self.config["server"]
             local_ip = get_local_ip()
-            port = int(server_config.get("port", 8000))
+            port = int(server_config.get("port", 18000))
             websocket_url = self._get_websocket_url(local_ip, port)
             message = f"OTA接口运行正常，向设备发送的websocket地址是：{websocket_url}"
             response = web.Response(text=message, content_type="text/plain")

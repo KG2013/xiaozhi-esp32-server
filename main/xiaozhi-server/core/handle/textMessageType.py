@@ -9,3 +9,6 @@ class TextMessageType(Enum):
     IOT = "iot"
     MCP = "mcp"
     SERVER = "server"
+    VOLUME = "volume"
+    LEAVE = "leave"
+    WELCOME = "welcome"

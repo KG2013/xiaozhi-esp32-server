@@ -17,6 +17,7 @@ from core.utils.output_counter import add_device_output
 from core.handle.reportHandle import enqueue_tts_report
 from core.handle.sendAudioHandle import sendAudioMessage
 from core.utils.util import audio_bytes_to_data_stream, audio_to_data_stream
+from core.utils.opus_encoder_utils import OpusConfig
 from core.providers.tts.dto.dto import (
     TTSMessageDTO,
     SentenceType,
@@ -69,6 +70,22 @@ class TTSProviderBase(ABC):
         self.processed_chars = 0
         self.is_first_sentence = True
 
+    def get_opus_config(self):
+        """
+        获取Opus配置，优先使用connection的配置，如果没有则使用默认值创建并缓存
+        
+        Args:
+            default_sample_rate: 默认采样率
+            default_channels: 默认通道数
+            default_frame_duration_ms: 默认帧时长（毫秒）
+            default_vbr: 默认VBR设置
+            
+        Returns:
+            OpusConfig对象
+        """
+        if self.conn and hasattr(self.conn, 'opus_config') and self.conn.opus_config:
+            return self.conn.opus_config
+
     def generate_filename(self, extension=".wav"):
         return os.path.join(
             self.output_file,
@@ -77,6 +94,10 @@ class TTSProviderBase(ABC):
 
     def handle_opus(self, opus_data: bytes):
         logger.bind(tag=TAG).debug(f"推送数据到队列里面帧数～～ {len(opus_data)}")
+        # 记录TTS首段音频生成时间（仅第一次）
+        if hasattr(self.conn, 'performance_tracker') and not hasattr(self, '_tts_first_audio_recorded'):
+            self.conn.performance_tracker.record("tts_first_audio")
+            self._tts_first_audio_recorded = True
         self.tts_audio_queue.put((SentenceType.MIDDLE, opus_data, None))
 
     def handle_audio_file(self, file_audio: bytes, text):
@@ -92,11 +113,13 @@ class TTSProviderBase(ABC):
                     audio_bytes = asyncio.run(self.text_to_speak(text, None))
                     if audio_bytes:
                         self.tts_audio_queue.put((SentenceType.FIRST, None, text))
+                        opus_config = getattr(self.conn, 'opus_config', None)
                         audio_bytes_to_data_stream(
                             audio_bytes,
                             file_type=self.audio_file_type,
                             is_opus=True,
                             callback=opus_handler,
+                            opus_config=opus_config,
                         )
                         break
                     else:
@@ -154,11 +177,13 @@ class TTSProviderBase(ABC):
                     audio_bytes = asyncio.run(self.text_to_speak(text, None))
                     if audio_bytes:
                         audio_datas = []
+                        opus_config = getattr(self.conn, 'opus_config', None)
                         audio_bytes_to_data_stream(
                             audio_bytes,
                             file_type=self.audio_file_type,
                             is_opus=True,
-                            callback=lambda data: audio_datas.append(data)
+                            callback=lambda data: audio_datas.append(data),
+                            opus_config=opus_config,
                         )
                         return audio_datas
                     else:
@@ -214,13 +239,15 @@ class TTSProviderBase(ABC):
         self, audio_file_path, callback: Callable[[Any], Any] = None
     ):
         """音频文件转换为PCM编码"""
-        return audio_to_data_stream(audio_file_path, is_opus=False, callback=callback)
+        opus_config = getattr(self.conn, 'opus_config', None) if self.conn else None
+        return audio_to_data_stream(audio_file_path, is_opus=False, callback=callback, opus_config=opus_config)
 
     def audio_to_opus_data_stream(
         self, audio_file_path, callback: Callable[[Any], Any] = None
     ):
         """音频文件转换为Opus编码"""
-        return audio_to_data_stream(audio_file_path, is_opus=True, callback=callback)
+        opus_config = getattr(self.conn, 'opus_config', None) if self.conn else None
+        return audio_to_data_stream(audio_file_path, is_opus=True, callback=callback, opus_config=opus_config)
 
     def tts_one_sentence(
         self,
@@ -272,6 +299,9 @@ class TTSProviderBase(ABC):
                 message = self.tts_text_queue.get(timeout=1)
                 if message.sentence_type == SentenceType.FIRST:
                     self.conn.client_abort = False
+                    # 重置TTS首段音频标记
+                    if hasattr(self, '_tts_first_audio_recorded'):
+                        delattr(self, '_tts_first_audio_recorded')
                 if self.conn.client_abort:
                     logger.bind(tag=TAG).info("收到打断信息，终止TTS文本处理线程")
                     continue
@@ -282,6 +312,9 @@ class TTSProviderBase(ABC):
                     self.tts_text_buff = []
                     self.is_first_sentence = True
                     self.tts_audio_first_sentence = True
+                    # 记录TTS开始时间
+                    if hasattr(self.conn, 'performance_tracker'):
+                        self.conn.performance_tracker.record("tts_start")
                 elif ContentType.TEXT == message.content_type:
                     self.tts_text_buff.append(message.content_detail)
                     segment_text = self._get_segment_text()

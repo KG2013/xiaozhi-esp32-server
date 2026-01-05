@@ -227,7 +227,7 @@
                     <p>您可以使用nginx映射启动测试页面，也可以请按照以下步骤使用python启动测试http服务：</p>
                     <ol>
                         <li>打开命令行终端</li>
-                        <li>命令行进入到 xiaozhi-server/test 目录</li>
+                        <li>命令行进入到 smhs-server/test 目录</li>
                         <li>执行以下命令启动HTTP服务器：</li>
                     </ol>
                     <pre>python -m http.server 8006</pre>
@@ -288,8 +288,8 @@
                 </span>
             </h2>
             <div class="connection-controls">
-                <input type="text" id="otaUrl" value="http://127.0.0.1:8002/xiaozhi/ota/"
-                    placeholder="OTA服务器地址，如：http://127.0.0.1:8002/xiaozhi/ota/" />
+                <input type="text" id="otaUrl" value="http://127.0.0.1:18002/smhs/ota/"
+                    placeholder="OTA服务器地址，如：http://127.0.0.1:18002/smhs/ota/" />
                 <input type="text" id="serverUrl" value="" readonly disabled placeholder="点击连接按钮后，自动从OTA接口获取" />
                 <button id="connectButton">连接</button>
             </div>
@@ -409,7 +409,7 @@
 
     <script type="module">
         import { log } from './js/utils/logger.js';
-        import { webSocketConnect } from './js/xiaoZhiConnect.js';
+        import { webSocketConnect } from './js/smhsConnect.js';
         import { checkOpusLoaded, initOpusEncoder } from './js/opus.js';
         import { addMessage } from './js/document.js'
         import BlockingQueue from './js/utils/BlockingQueue.js'
@@ -911,7 +911,7 @@
                 let isXiaozhiNative = false;
 
                 // 检查是否是小智原生服务器 (根据URL特征判断)
-                if (serverUrl.includes('xiaozhi') || serverUrl.includes('localhost') || serverUrl.includes('127.0.0.1')) {
+                if (serverUrl.includes('smhs') || serverUrl.includes('localhost') || serverUrl.includes('127.0.0.1')) {
                     isXiaozhiNative = true;
                     log('检测到小智原生服务器，使用标准listen协议', 'info');
                 }

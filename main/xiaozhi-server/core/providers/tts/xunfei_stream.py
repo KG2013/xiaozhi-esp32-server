@@ -11,7 +11,7 @@ import traceback
 import websockets
 from asyncio import Task
 from config.logger import setup_logging
-from core.utils import opus_encoder_utils
+from core.utils.util import pcm_to_data_stream
 from core.utils.tts import MarkdownCleaner
 from urllib.parse import urlencode, urlparse
 from core.providers.tts.base import TTSProviderBase
@@ -113,10 +113,6 @@ class TTSProvider(TTSProviderBase):
         # 序列号管理
         self.text_seq = 0
 
-        # 创建Opus编码器
-        self.opus_encoder = opus_encoder_utils.OpusEncoderUtils(
-            sample_rate=self.sample_rate, channels=1, frame_size_ms=60
-        )
 
         # 验证必需参数
         if not all([self.app_id, self.api_key, self.api_secret]):
@@ -368,8 +364,12 @@ class TTSProvider(TTSProviderBase):
                                         self.conn.tts_MessageText = None
                                     try:
                                         audio_bytes = base64.b64decode(audio_data)
-                                        self.opus_encoder.encode_pcm_to_opus_stream(
-                                            audio_bytes, False, self.handle_opus
+                                        opus_config = self.get_opus_config(default_sample_rate=self.sample_rate, default_frame_duration_ms=60)
+                                        pcm_to_data_stream(
+                                            audio_bytes,
+                                            is_opus=True,
+                                            callback=self.handle_opus,
+                                            opus_config=opus_config
                                         )
 
                                     except Exception as e:
@@ -452,10 +452,12 @@ class TTSProvider(TTSProviderBase):
                                 if status == 1:
                                     try:
                                         audio_bytes = base64.b64decode(audio_base64)
-                                        self.opus_encoder.encode_pcm_to_opus_stream(
+                                        opus_config = self.get_opus_config(default_sample_rate=self.sample_rate, default_frame_duration_ms=60)
+                                        pcm_to_data_stream(
                                             audio_bytes,
-                                            end_of_stream=False,
-                                            callback=lambda opus: audio_data.append(opus)
+                                            is_opus=True,
+                                            callback=lambda opus: audio_data.append(opus),
+                                            opus_config=opus_config
                                         )
                                     except Exception as e:
                                         logger.bind(tag=TAG).error(f"处理音频数据失败: {e}")

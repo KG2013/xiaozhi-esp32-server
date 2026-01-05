@@ -8,15 +8,15 @@ import queue
 import asyncio
 import traceback
 import threading
-import opuslib_next
 import concurrent.futures
 from abc import ABC, abstractmethod
 from config.logger import setup_logging
 from typing import Optional, Tuple, List
 from core.handle.receiveAudioHandle import startToChat
 from core.handle.reportHandle import enqueue_asr_report
-from core.utils.util import remove_punctuation_and_length
+from core.utils.util import remove_punctuation_and_length, decode_opus_to_pcm
 from core.handle.receiveAudioHandle import handleAudioMessage
+from core.utils.opus_encoder_utils import OpusConfig
 
 TAG = __name__
 logger = setup_logging()
@@ -75,13 +75,20 @@ class ASRProviderBase(ABC):
     async def handle_voice_stop(self, conn, asr_audio_task: List[bytes]):
         """并行处理ASR和声纹识别"""
         try:
+            # 记录设备发完语音的时间点
+            if hasattr(conn, 'performance_tracker'):
+                conn.performance_tracker.reset()  # 重置追踪器
+                conn.performance_tracker.record("voice_stop_detected")
+            
             total_start_time = time.monotonic()
             
-            # 准备音频数据
+            # 准备音频数据 - 统一解码一次，避免重复解码
             if conn.audio_format == "pcm":
                 pcm_data = asr_audio_task
             else:
-                pcm_data = self.decode_opus(asr_audio_task)
+                # 获取Opus配置，如果没有则使用None（将使用默认配置）
+                opus_config = getattr(conn, 'opus_config', None)
+                pcm_data = self.decode_opus(asr_audio_task, opus_config)
             
             combined_pcm_data = b"".join(pcm_data)
             
@@ -90,24 +97,39 @@ class ASRProviderBase(ABC):
             if conn.voiceprint_provider and combined_pcm_data:
                 wav_data = self._pcm_to_wav(combined_pcm_data)
             
-            # 定义ASR任务
+            # 定义ASR任务 - 传入已解码的PCM数据，避免重复解码
             def run_asr():
+                # 记录ASR开始时间
+                if hasattr(conn, 'performance_tracker'):
+                    conn.performance_tracker.record("asr_start")
+                
                 start_time = time.monotonic()
                 try:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     try:
+                        # 直接传入已解码的PCM数据，audio_format设为"pcm"
                         result = loop.run_until_complete(
-                            self.speech_to_text(asr_audio_task, conn.session_id, conn.audio_format)
+                            self.speech_to_text(pcm_data, conn.session_id, "pcm", None)
                         )
                         end_time = time.monotonic()
                         logger.bind(tag=TAG).info(f"ASR耗时: {end_time - start_time:.3f}s")
+                        
+                        # 记录ASR结束时间
+                        if hasattr(conn, 'performance_tracker'):
+                            conn.performance_tracker.record("asr_end")
+                        
                         return result
                     finally:
                         loop.close()
                 except Exception as e:
                     end_time = time.monotonic()
                     logger.bind(tag=TAG).error(f"ASR失败: {e}")
+                    
+                    # 即使失败也记录ASR结束时间
+                    if hasattr(conn, 'performance_tracker'):
+                        conn.performance_tracker.record("asr_end")
+                    
                     return ("", None)
             
             # 定义声纹识别任务
@@ -233,35 +255,27 @@ class ASRProviderBase(ABC):
 
     @abstractmethod
     async def speech_to_text(
-        self, opus_data: List[bytes], session_id: str, audio_format="opus"
+        self, opus_data: List[bytes], session_id: str, audio_format="opus", opus_config: Optional[OpusConfig] = None
     ) -> Tuple[Optional[str], Optional[str]]:
-        """将语音数据转换为文本"""
+        """将语音数据转换为文本
+        
+        Args:
+            opus_data: 音频数据列表
+            session_id: 会话ID
+            audio_format: 音频格式（opus或pcm）
+            opus_config: Opus配置对象，用于解码Opus音频
+        """
         pass
 
     @staticmethod
-    def decode_opus(opus_data: List[bytes]) -> List[bytes]:
-        """将Opus音频数据解码为PCM数据"""
-        try:
-            decoder = opuslib_next.Decoder(16000, 1)
-            pcm_data = []
-            buffer_size = 960  # 每次处理960个采样点 (60ms at 16kHz)
-            
-            for i, opus_packet in enumerate(opus_data):
-                try:
-                    if not opus_packet or len(opus_packet) == 0:
-                        continue
-                    
-                    pcm_frame = decoder.decode(opus_packet, buffer_size)
-                    if pcm_frame and len(pcm_frame) > 0:
-                        pcm_data.append(pcm_frame)
-                        
-                except opuslib_next.OpusError as e:
-                    logger.bind(tag=TAG).warning(f"Opus解码错误，跳过数据包 {i}: {e}")
-                except Exception as e:
-                    logger.bind(tag=TAG).error(f"音频处理错误，数据包 {i}: {e}")
-            
-            return pcm_data
-            
-        except Exception as e:
-            logger.bind(tag=TAG).error(f"音频解码过程发生错误: {e}")
-            return []
+    def decode_opus(opus_data: List[bytes], config: Optional[OpusConfig] = None) -> List[bytes]:
+        """将Opus音频数据解码为PCM数据（复用util.py中的统一实现）
+        
+        Args:
+            opus_data: Opus音频数据列表
+            config: Opus配置对象，如果为None则使用默认配置 (16000Hz, 1通道, 20ms帧)
+        
+        Returns:
+            PCM数据列表
+        """
+        return decode_opus_to_pcm(opus_data, config)

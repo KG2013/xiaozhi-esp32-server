@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="xiaozhi.modules.device.dao.DeviceDao">
+<mapper namespace="smhs.modules.device.dao.DeviceDao">
     <!-- 获取此智能体全部设备的最后连接时间 -->
     <select id="getAllLastConnectedAtByAgentId" resultType="java.util.Date">
         SELECT last_connected_at FROM ai_device
@@ -9,4 +9,25 @@
         order by
             last_connected_at desc limit 0,1
     </select>
+
+    <!--使用MyBatis-Plus查询数据库中最大的序列号-->
+    <select id="selectMap" resultType="java.util.Map">
+        SELECT
+        MAX(CAST( SUBSTRING( ssid, LENGTH( #{deviceCodePrefix} ) + 1 ) AS SIGNED )) AS maxSerial
+        FROM
+        ai_device
+        WHERE ssid LIKE concat('%',#{deviceCodePrefix},'%')
+    </select>
+
+    <!-- 查询蓝牙id为主的分页 -->
+    <select id="selectDeviceBluetoothIdList">
+        SELECT bluetooth_id,ssid FROM ai_device
+    </select>
+
+    <!-- 绑定设备蓝牙Id根据设备编码 -->
+    <update id="bindBluetoothIdBySsid">
+        UPDATE ai_device
+        SET bluetooth_id = #{bluetoothId}
+        WHERE ssid = #{ssid}
+    </update>
 </mapper> 

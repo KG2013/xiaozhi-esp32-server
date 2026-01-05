@@ -8,7 +8,7 @@ from typing import Callable, Any
 import websockets
 from core.utils.tts import MarkdownCleaner
 from config.logger import setup_logging
-from core.utils import opus_encoder_utils
+from core.utils.util import pcm_to_data_stream
 from core.utils.util import check_model_key
 from core.providers.tts.base import TTSProviderBase
 from core.providers.tts.dto.dto import SentenceType, ContentType, InterfaceType
@@ -165,9 +165,6 @@ class TTSProvider(TTSProviderBase):
         self.header = {"Authorization": f"{self.authorization}{self.access_token}"}
         self.enable_two_way = True
         self.tts_text = ""
-        self.opus_encoder = opus_encoder_utils.OpusEncoderUtils(
-            sample_rate=16000, channels=1, frame_size_ms=60
-        )
         model_key_msg = check_model_key("TTS", self.access_token)
         if model_key_msg:
             logger.bind(tag=TAG).error(model_key_msg)
@@ -631,7 +628,13 @@ class TTSProvider(TTSProviderBase):
         )
 
     def wav_to_opus_data_audio_raw_stream(self, raw_data_var, is_end=False, callback: Callable[[Any], Any]=None):
-        return self.opus_encoder.encode_pcm_to_opus_stream(raw_data_var, is_end, callback=callback)
+        opus_config = self.get_opus_config(default_sample_rate=16000, default_frame_duration_ms=60)
+        pcm_to_data_stream(
+            raw_data_var,
+            is_opus=True,
+            callback=callback,
+            opus_config=opus_config
+        )
 
     def to_tts(self, text: str) -> list:
         """非流式生成音频数据，用于生成音频及测试场景

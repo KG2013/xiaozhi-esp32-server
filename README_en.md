@@ -1,10 +1,10 @@
-[![Banners](docs/images/banner1.png)](https://github.com/xinnan-tech/xiaozhi-esp32-server)
+[![Banners](docs/images/banner1.png)](https://github.com/xinnan-tech/smhs-esp32-server)
 
-<h1 align="center">Xiaozhi Backend Service xiaozhi-esp32-server</h1>
+<h1 align="center">Xiaozhi Backend Service smhs-esp32-server</h1>
 
 <p align="center">
 This project is based on human-machine symbiotic intelligence theory and technology to develop intelligent terminal hardware and software systems<br/>providing backend services for the open-source intelligent hardware project
-<a href="https://github.com/78/xiaozhi-esp32">xiaozhi-esp32</a><br/>
+<a href="https://github.com/78/smhs-esp32">smhs-esp32</a><br/>
 Implemented using Python, Java, and Vue according to the <a href="https://ccnphfhqs21z.feishu.cn/wiki/M0XiwldO9iJwHikpXD5cEx71nKh">Xiaozhi Communication Protocol</a><br/>
 Supports MCP endpoints and voiceprint recognition
 </p>
@@ -12,28 +12,28 @@ Supports MCP endpoints and voiceprint recognition
 <p align="center">
 <a href="./README.md">中文</a>
 · <a href="./docs/FAQ.md">FAQ</a>
-· <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server/issues">Report Issues</a>
+· <a href="https://github.com/xinnan-tech/smhs-esp32-server/issues">Report Issues</a>
 · <a href="./README.md#%E9%83%A8%E7%BD%B2%E6%96%87%E6%A1%A3">Deployment Docs</a>
-· <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server/releases">Release Notes</a>
+· <a href="https://github.com/xinnan-tech/smhs-esp32-server/releases">Release Notes</a>
 </p>
 <p align="center">
-  <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server/releases">
-    <img alt="GitHub Contributors" src="https://img.shields.io/github/v/release/xinnan-tech/xiaozhi-esp32-server?logo=docker" />
+  <a href="https://github.com/xinnan-tech/smhs-esp32-server/releases">
+    <img alt="GitHub Contributors" src="https://img.shields.io/github/v/release/xinnan-tech/smhs-esp32-server?logo=docker" />
   </a>
-  <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server/graphs/contributors">
-    <img alt="GitHub Contributors" src="https://img.shields.io/github/contributors/xinnan-tech/xiaozhi-esp32-server?logo=github" />
+  <a href="https://github.com/xinnan-tech/smhs-esp32-server/graphs/contributors">
+    <img alt="GitHub Contributors" src="https://img.shields.io/github/contributors/xinnan-tech/smhs-esp32-server?logo=github" />
   </a>
-  <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server/issues">
-    <img alt="Issues" src="https://img.shields.io/github/issues/xinnan-tech/xiaozhi-esp32-server?color=0088ff" />
+  <a href="https://github.com/xinnan-tech/smhs-esp32-server/issues">
+    <img alt="Issues" src="https://img.shields.io/github/issues/xinnan-tech/smhs-esp32-server?color=0088ff" />
   </a>
-  <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server/pulls">
-    <img alt="GitHub pull requests" src="https://img.shields.io/github/issues-pr/xinnan-tech/xiaozhi-esp32-server?color=0088ff" />
+  <a href="https://github.com/xinnan-tech/smhs-esp32-server/pulls">
+    <img alt="GitHub pull requests" src="https://img.shields.io/github/issues-pr/xinnan-tech/smhs-esp32-server?color=0088ff" />
   </a>
-  <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server/blob/main/LICENSE">
+  <a href="https://github.com/xinnan-tech/smhs-esp32-server/blob/main/LICENSE">
     <img alt="GitHub pull requests" src="https://img.shields.io/badge/license-MIT-white?labelColor=black" />
   </a>
-  <a href="https://github.com/xinnan-tech/xiaozhi-esp32-server">
-    <img alt="stars" src="https://img.shields.io/github/stars/xinnan-tech/xiaozhi-esp32-server?color=ffcb47&labelColor=black" />
+  <a href="https://github.com/xinnan-tech/smhs-esp32-server">
+    <img alt="stars" src="https://img.shields.io/github/stars/xinnan-tech/smhs-esp32-server?color=ffcb47&labelColor=black" />
   </a>
 </p>
 
@@ -49,7 +49,7 @@ Spearheaded by Professor Siyuan Liu's Team (South China University of Technology
 
 ## Target Users 👥
 
-This project requires ESP32 hardware devices to work. If you have purchased ESP32-related hardware, successfully connected to Brother Xia's deployed backend service, and want to build your own `xiaozhi-esp32` backend service independently, then this project is perfect for you.
+This project requires ESP32 hardware devices to work. If you have purchased ESP32-related hardware, successfully connected to Brother Xia's deployed backend service, and want to build your own `smhs-esp32` backend service independently, then this project is perfect for you.
 
 Want to see the usage effects? Click the videos below 🎥
 
@@ -197,8 +197,8 @@ Intelligent Control Console Address: https://2662r3426b.vicp.fun
 Intelligent Control Console Address (H5): https://2662r3426b.vicp.fun/h5/index.html
 
 Service Test Tool: https://2662r3426b.vicp.fun/test/
-OTA Interface Address: https://2662r3426b.vicp.fun/xiaozhi/ota/
-Websocket Interface Address: wss://2662r3426b.vicp.fun/xiaozhi/v1/
+OTA Interface Address: https://2662r3426b.vicp.fun/smhs/ota/
+Websocket Interface Address: wss://2662r3426b.vicp.fun/smhs/v1/
 ```
 
 #### 🚩 Configuration Description and Recommendations
@@ -225,9 +225,9 @@ This project provides the following testing tools to help you verify the system 
 
 | Tool Name | Location | Usage Method | Function Description |
 |:---:|:---|:---:|:---:|
-| Audio Interaction Test Tool | main》xiaozhi-server》test》test_page.html | Open directly with Google Chrome | Tests audio playback and reception functions, verifies if Python-side audio processing is normal |
-| Model Response Test Tool 1 | main》xiaozhi-server》performance_tester.py | Execute `python performance_tester.py` | Tests response speed of three core modules: ASR(speech recognition), LLM(large model), TTS(speech synthesis) |
-| Model Response Test Tool 2 | main》xiaozhi-server》performance_tester_vllm.py | Execute `python performance_tester_vllm.py` | Tests VLLM(vision model) response speed |
+| Audio Interaction Test Tool | main》smhs-server》test》test_page.html | Open directly with Google Chrome | Tests audio playback and reception functions, verifies if Python-side audio processing is normal |
+| Model Response Test Tool 1 | main》smhs-server》performance_tester.py | Execute `python performance_tester.py` | Tests response speed of three core modules: ASR(speech recognition), LLM(large model), TTS(speech synthesis) |
+| Model Response Test Tool 2 | main》smhs-server》performance_tester_vllm.py | Execute `python performance_tester_vllm.py` | Tests VLLM(vision model) response speed |
 
 > 💡 Note: When testing model speed, only models with configured keys will be tested.
 
@@ -237,7 +237,7 @@ This project provides the following testing tools to help you verify the system 
 ![请参考-全模块安装架构图](docs/images/deploy2.png)
 | Feature Module | Description |
 |:---:|:---|
-| Core Architecture | Based on [MQTT+UDP gateway](https://github.com/xinnan-tech/xiaozhi-esp32-server/blob/main/docs/mqtt-gateway-integration.md), WebSocket and HTTP servers, provides complete console management and authentication system |
+| Core Architecture | Based on [MQTT+UDP gateway](https://github.com/xinnan-tech/smhs-esp32-server/blob/main/docs/mqtt-gateway-integration.md), WebSocket and HTTP servers, provides complete console management and authentication system |
 | Voice Interaction | Supports streaming ASR(speech recognition), streaming TTS(speech synthesis), VAD(voice activity detection), supports multi-language recognition and voice processing |
 | Voiceprint Recognition | Supports multi-user voiceprint registration, management, and recognition, processes in parallel with ASR, real-time speaker identity recognition and passes to LLM for personalized responses |
 | Intelligent Dialogue | Supports multiple LLM(large language models), implements intelligent dialogue |
@@ -260,13 +260,13 @@ If you are a software developer, here is an [Open Letter to Developers](docs/con
 ---
 
 ## Product Ecosystem 👬
-Xiaozhi is an ecosystem. When using this product, you can also check out other [excellent projects](https://github.com/78/xiaozhi-esp32?tab=readme-ov-file#%E7%9B%B8%E5%85%B3%E5%BC%80%E6%BA%90%E9%A1%B9%E7%9B%AE) in this ecosystem
+Xiaozhi is an ecosystem. When using this product, you can also check out other [excellent projects](https://github.com/78/smhs-esp32?tab=readme-ov-file#%E7%9B%B8%E5%85%B3%E5%BC%80%E6%BA%90%E9%A1%B9%E7%9B%AE) in this ecosystem
 
 | Project Name | Project Address | Project Description |
 |:---------------------|:--------|:--------|
-| Xiaozhi Android Client | [xiaozhi-android-client](https://github.com/TOM88812/xiaozhi-android-client) | An Android and iOS voice dialogue application based on xiaozhi-server, supporting real-time voice interaction and text dialogue.<br/>Currently a Flutter version, connecting iOS and Android platforms. |
-| Xiaozhi Desktop Client | [py-xiaozhi](https://github.com/Huang-junsen/py-xiaozhi) | This project provides a Python-based AI client for beginners, allowing users to experience Xiaozhi AI functionality through code even without physical hardware conditions. |
-| Xiaozhi Java Server | [xiaozhi-esp32-server-java](https://github.com/joey-zhou/xiaozhi-esp32-server-java) | Xiaozhi open-source backend service Java version is a Java-based open-source project.<br/>It includes frontend and backend services, aiming to provide users with a complete backend service solution. |
+| Xiaozhi Android Client | [smhs-android-client](https://github.com/TOM88812/smhs-android-client) | An Android and iOS voice dialogue application based on smhs-server, supporting real-time voice interaction and text dialogue.<br/>Currently a Flutter version, connecting iOS and Android platforms. |
+| Xiaozhi Desktop Client | [py-smhs](https://github.com/Huang-junsen/py-smhs) | This project provides a Python-based AI client for beginners, allowing users to experience Xiaozhi AI functionality through code even without physical hardware conditions. |
+| Xiaozhi Java Server | [smhs-esp32-server-java](https://github.com/joey-zhou/smhs-esp32-server-java) | Xiaozhi open-source backend service Java version is a Java-based open-source project.<br/>It includes frontend and backend services, aiming to provide users with a complete backend service solution. |
 
 ---
 
@@ -357,14 +357,14 @@ In fact, any VLLM that supports OpenAI interface calls can be integrated and use
 | <img src="./docs/images/logo_junsen.png" width="160"> | [huangjunsen](https://github.com/huangjunsen0406) | Thanks to [huangjunsen](https://github.com/huangjunsen0406) for contributing the `Smart Control Console Mobile` module, which enables efficient control and real-time interaction across mobile devices, significantly enhancing the system's operational convenience and management efficiency in mobile scenarios. |
 | <img src="./docs/images/logo_huiyuan.png" width="160"> | [Huiyuan Design](http://ui.kwd988.net/) | Thanks to [Huiyuan Design](http://ui.kwd988.net/) for providing professional visual solutions for this project, using their design practical experience serving over a thousand enterprises to empower this project's product user experience |
 | <img src="./docs/images/logo_qinren.png" width="160"> | [Xi'an Qinren Information Technology](https://www.029app.com/) | Thanks to [Xi'an Qinren Information Technology](https://www.029app.com/) for deepening this project's visual system, ensuring consistency and extensibility of overall design style in multi-scenario applications |
-| <img src="./docs/images/logo_contributors.png" width="160"> | [Code Contributors](https://github.com/xinnan-tech/xiaozhi-esp32-server/graphs/contributors) | Thanks to [all code contributors](https://github.com/xinnan-tech/xiaozhi-esp32-server/graphs/contributors), your efforts have made the project more robust and powerful. |
+| <img src="./docs/images/logo_contributors.png" width="160"> | [Code Contributors](https://github.com/xinnan-tech/smhs-esp32-server/graphs/contributors) | Thanks to [all code contributors](https://github.com/xinnan-tech/smhs-esp32-server/graphs/contributors), your efforts have made the project more robust and powerful. |
 
 
-<a href="https://star-history.com/#xinnan-tech/xiaozhi-esp32-server&Date">
+<a href="https://star-history.com/#xinnan-tech/smhs-esp32-server&Date">
 
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=xinnan-tech/xiaozhi-esp32-server&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=xinnan-tech/xiaozhi-esp32-server&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=xinnan-tech/xiaozhi-esp32-server&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=xinnan-tech/smhs-esp32-server&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=xinnan-tech/smhs-esp32-server&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=xinnan-tech/smhs-esp32-server&type=Date" />
  </picture>
 </a>

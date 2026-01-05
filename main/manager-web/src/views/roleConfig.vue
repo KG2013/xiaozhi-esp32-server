@@ -129,6 +129,12 @@
                           :value="item.value" />
                       </el-select>
                     </el-form-item>
+                    <el-form-item label="开场语">
+                      <el-input v-model="form.greetingMessage" class="form-input" clearable maxlength="50" />
+                    </el-form-item>
+                    <el-form-item label="离场语">
+                      <el-input v-model="form.leaveMessage" class="form-input" clearable maxlength="50" />
+                    </el-form-item>
                   </div>
                 </div>
               </div>
@@ -163,6 +169,8 @@ export default {
         langCode: "",
         language: "",
         sort: "",
+        greetingMessage:"",
+        leaveMessage:"",
         model: {
           ttsModelId: "",
           vadModelId: "",
@@ -219,6 +227,8 @@ export default {
         langCode: this.form.langCode,
         language: this.form.language,
         sort: this.form.sort,
+        greetingMessage:this.form.greetingMessage,
+        leaveMessage:this.form.leaveMessage,
         functions: this.currentFunctions.map(item => {
           return ({
             pluginId: item.id,
@@ -566,6 +576,9 @@ export default {
 </script>
 
 <style scoped>
+/deep/ .el-form-item{
+  margin-bottom: 10px;
+}
 .welcome {
   min-width: 900px;
   height: 100vh;

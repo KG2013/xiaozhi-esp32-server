@@ -1,7 +1,7 @@
 import os
 import time
 import base64
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 import httpx
 
@@ -67,8 +67,22 @@ class ManageApiClient:
         response.raise_for_status()
 
         result = response.json()
+        
+        # 添加详细日志
+        # print(f"[API响应] {method} {endpoint}")
+        # print(f"[API响应] 状态码: {response.status_code}")
+        # print(f"[API响应] 完整响应: {result}")
+        # print(f"[API响应] code字段: {result.get('code')}, 类型: {type(result.get('code'))}")
+        # print(f"[API响应] msg字段: {result.get('msg')}")
+        # print(f"[API响应] data字段: {result.get('data')}")
 
-        # 处理API返回的业务错误
+        # 判断返回格式：如果没有 code 字段，说明是直接返回的数据对象（如 ResponseEntity）
+        if "code" not in result:
+            print(f"[API响应] 检测到直接返回数据格式，不包含 code 字段")
+            # 直接返回整个结果对象
+            return result
+
+        # 处理标准 Result 包装格式的API返回
         if result.get("code") == 10041:
             raise DeviceNotFoundException(result.get("msg"))
         elif result.get("code") == 10042:
@@ -131,25 +145,27 @@ def get_server_config() -> Optional[Dict]:
 
 
 def get_agent_models(
-    mac_address: str, client_id: str, selected_module: Dict
+    ssid: str, client_id: str, selected_module: Dict
 ) -> Optional[Dict]:
     """获取代理模型配置"""
+    print(f"[DEBUG] get_agent_models 调用: ssid={ssid}, client_id={client_id}")
+    
     return ManageApiClient._instance._execute_request(
         "POST",
-        "/config/agent-models",
+        "/config/agent-models-ssid",
         json={
-            "macAddress": mac_address,
+            "ssid": ssid,
             "clientId": client_id,
             "selectedModule": selected_module,
         },
     )
 
 
-def save_mem_local_short(mac_address: str, short_momery: str) -> Optional[Dict]:
+def save_mem_local_short(ssid: str, short_momery: str) -> Optional[Dict]:
     try:
         return ManageApiClient._instance._execute_request(
             "PUT",
-            f"/agent/saveMemory/" + mac_address,
+            f"/agent/saveMemory/" + ssid,
             json={
                 "summaryMemory": short_momery,
             },
@@ -160,7 +176,7 @@ def save_mem_local_short(mac_address: str, short_momery: str) -> Optional[Dict]:
 
 
 def report(
-    mac_address: str, session_id: str, chat_type: int, content: str, audio, report_time
+    ssid: str, session_id: str, chat_type: int, content: str, audio, report_time
 ) -> Optional[Dict]:
     """带熔断的业务方法示例"""
     if not content or not ManageApiClient._instance:
@@ -170,7 +186,8 @@ def report(
             "POST",
             f"/agent/chat-history/report",
             json={
-                "macAddress": mac_address,
+                "ssid": ssid,
+                "macAddress":ssid,
                 "sessionId": session_id,
                 "chatType": chat_type,
                 "content": content,
@@ -184,10 +201,8 @@ def report(
         print(f"TTS上报失败: {e}")
         return None
 
-
 def init_service(config):
     ManageApiClient(config)
-
 
 def manage_api_http_safe_close():
     ManageApiClient.safe_close()

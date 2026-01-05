@@ -213,7 +213,7 @@ class ASRProvider(ASRProviderBase):
             return None
 
     async def speech_to_text(
-        self, opus_data: List[bytes], session_id: str, audio_format="opus"
+        self, opus_data: List[bytes], session_id: str, audio_format="opus", opus_config=None
     ) -> Tuple[Optional[str], Optional[str]]:
         """将语音数据转换为文本"""
         if self._is_token_expired():
@@ -226,7 +226,7 @@ class ASRProvider(ASRProviderBase):
             if audio_format == "pcm":
                 pcm_data = opus_data
             else:
-                pcm_data = self.decode_opus(opus_data)
+                pcm_data = self.decode_opus(opus_data, opus_config)
             combined_pcm_data = b"".join(pcm_data)
 
             # 判断是否保存为WAV文件

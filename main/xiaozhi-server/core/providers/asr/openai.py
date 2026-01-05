@@ -21,14 +21,14 @@ class ASRProvider(ASRProviderBase):
 
         os.makedirs(self.output_dir, exist_ok=True)
 
-    async def speech_to_text(self, opus_data: List[bytes], session_id: str, audio_format="opus") -> Tuple[Optional[str], Optional[str]]:
+    async def speech_to_text(self, opus_data: List[bytes], session_id: str, audio_format="opus", opus_config=None) -> Tuple[Optional[str], Optional[str]]:
         file_path = None
         try:
             start_time = time.time()
             if audio_format == "pcm":
                 pcm_data = opus_data
             else:
-                pcm_data = self.decode_opus(opus_data)
+                pcm_data = self.decode_opus(opus_data, opus_config)
             file_path = self.save_audio_to_file(pcm_data, session_id)
 
             logger.bind(tag=TAG).debug(

@@ -16,7 +16,8 @@ from urllib import parse
 from core.providers.tts.base import TTSProviderBase
 from core.providers.tts.dto.dto import SentenceType, ContentType, InterfaceType
 from core.utils.tts import MarkdownCleaner
-from core.utils import opus_encoder_utils, textUtils
+from core.utils import textUtils
+from core.utils.util import pcm_to_data_stream
 from config.logger import setup_logging
 
 TAG = __name__
@@ -134,10 +135,6 @@ class TTSProvider(TTSProviderBase):
         # 专属tts设置
         self.task_id = uuid.uuid4().hex
 
-        # 创建Opus编码器
-        self.opus_encoder = opus_encoder_utils.OpusEncoderUtils(
-            sample_rate=16000, channels=1, frame_size_ms=60
-        )
 
         # Token管理
         if self.access_key_id and self.access_key_secret:
@@ -451,7 +448,13 @@ class TTSProvider(TTSProviderBase):
                             logger.bind(tag=TAG).warning("收到无效的JSON消息")
                     # 二进制消息（音频数据）
                     elif isinstance(msg, (bytes, bytearray)):
-                        self.opus_encoder.encode_pcm_to_opus_stream(msg, False, self.handle_opus)
+                        opus_config = self.get_opus_config(default_sample_rate=16000, default_frame_duration_ms=60)
+                        pcm_to_data_stream(
+                            msg,
+                            is_opus=True,
+                            callback=self.handle_opus,
+                            opus_config=opus_config
+                        )
                 except websockets.ConnectionClosed:
                     logger.bind(tag=TAG).warning("WebSocket连接已关闭")
                     break
@@ -569,10 +572,12 @@ class TTSProvider(TTSProviderBase):
                     while not synthesis_completed:
                         msg = await ws.recv()
                         if isinstance(msg, (bytes, bytearray)):
-                            self.opus_encoder.encode_pcm_to_opus_stream(
+                            opus_config = self.get_opus_config(default_sample_rate=16000, default_frame_duration_ms=60)
+                            pcm_to_data_stream(
                                 msg,
-                                end_of_stream=False,
-                                callback=lambda opus: audio_data.append(opus)
+                                is_opus=True,
+                                callback=lambda opus: audio_data.append(opus),
+                                opus_config=opus_config
                             )
                         elif isinstance(msg, str):
                             data = json.loads(msg)

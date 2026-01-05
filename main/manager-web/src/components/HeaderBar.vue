@@ -3,8 +3,8 @@
     <div class="header-container">
       <!-- 左侧元素 -->
       <div class="header-left" @click="goHome">
-        <img loading="lazy" alt="" src="@/assets/xiaozhi-logo.png" class="logo-img" />
-        <img loading="lazy" alt="" src="@/assets/xiaozhi-ai.png" class="brand-img" />
+        <img loading="lazy" alt="" src="@/assets/smhs-logo.png" class="logo-img" />
+        <img loading="lazy" alt="" src="@/assets/smhs-ai.png" class="brand-img" />
       </div>
 
       <!-- 中间导航菜单 -->
@@ -169,11 +169,11 @@
             ></i>
           </span>
           <el-dropdown-menu slot="dropdown">
-            <el-dropdown-item @click.native="goOtaManagement">
-              {{ $t("header.otaManagement") }}
-            </el-dropdown-item>
             <el-dropdown-item @click.native="goParamManagement">
               {{ $t("header.paramManagement") }}
+            </el-dropdown-item>
+            <el-dropdown-item @click.native="goOtaManagement">
+              {{ $t("header.otaManagement") }}
             </el-dropdown-item>
             <el-dropdown-item @click.native="goDictManagement">
               {{ $t("header.dictManagement") }}
@@ -311,7 +311,7 @@ export default {
       // 搜索历史相关
       searchHistory: [],
       showHistory: false,
-      SEARCH_HISTORY_KEY: "xiaozhi_search_history",
+      SEARCH_HISTORY_KEY: "smhs_search_history",
       MAX_HISTORY_COUNT: 3,
       // Cascader 配置
       cascaderProps: {

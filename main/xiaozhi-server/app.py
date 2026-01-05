@@ -74,7 +74,7 @@ async def main():
     port = int(config["server"].get("http_port", 8003))
     if not read_config_from_api:
         logger.bind(tag=TAG).info(
-            "OTA接口是\t\thttp://{}:{}/xiaozhi/ota/",
+            "OTA接口是\t\thttp://{}:{}/smhs/ota/",
             get_local_ip(),
             port,
         )
@@ -96,13 +96,13 @@ async def main():
             config["mcp_endpoint"] = "你的接入点 websocket地址"
 
     # 获取WebSocket配置，使用安全的默认值
-    websocket_port = 8000
+    websocket_port = 18000
     server_config = config.get("server", {})
     if isinstance(server_config, dict):
-        websocket_port = int(server_config.get("port", 8000))
+        websocket_port = int(server_config.get("port", 18000))
 
     logger.bind(tag=TAG).info(
-        "Websocket地址是\tws://{}:{}/xiaozhi/v1/",
+        "Websocket地址是\tws://{}:{}/smhs/v1/",
         get_local_ip(),
         websocket_port,
     )

@@ -1,0 +1,26 @@
+# Docker安装Qdrant向量数据库
+# Qdrant是一个高性能的向量相似度搜索引擎,用于存储和检索向量嵌入
+
+version: '3'
+services:
+  # Qdrant向量数据库
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: smhs-qdrant
+    restart: always
+    ports:
+      # HTTP API端口
+      - "6333:6333"
+      # gRPC端口(可选)
+      - "6334:6334"
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      # 持久化存储目录
+      - ./data/qdrant_storage:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6333/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+

@@ -7,7 +7,6 @@ import hashlib
 import asyncio
 import requests
 import websockets
-import opuslib_next
 import random
 from typing import Optional, Tuple, List
 from urllib import parse
@@ -15,9 +14,14 @@ from datetime import datetime
 from config.logger import setup_logging
 from core.providers.asr.base import ASRProviderBase
 from core.providers.asr.dto.dto import InterfaceType
+from core.utils.util import decode_opus_to_pcm
 
 TAG = __name__
 logger = setup_logging()
+
+# ASR服务要求的音频格式
+ASR_TARGET_SAMPLE_RATE = 16000
+ASR_TARGET_CHANNELS = 1
 
 
 class AccessToken:
@@ -72,7 +76,6 @@ class ASRProvider(ASRProviderBase):
         self.interface_type = InterfaceType.STREAM
         self.config = config
         self.text = ""
-        self.decoder = opuslib_next.Decoder(16000, 1)
         self.asr_ws = None
         self.forward_task = None
         self.is_processing = False
@@ -150,8 +153,15 @@ class ASRProvider(ASRProviderBase):
 
         if self.asr_ws and self.is_processing and self.server_ready:
             try:
-                pcm_frame = self.decoder.decode(audio, 960)
-                await self.asr_ws.send(pcm_frame)
+                opus_config = getattr(conn, 'opus_config', None)
+                pcm_data = decode_opus_to_pcm(
+                    [audio], opus_config,
+                    target_sample_rate=ASR_TARGET_SAMPLE_RATE,
+                    target_channels=ASR_TARGET_CHANNELS
+                )
+                if pcm_data:
+                    pcm_frame = b"".join(pcm_data)
+                    await self.asr_ws.send(pcm_frame)
             except Exception as e:
                 logger.bind(tag=TAG).warning(f"发送音频失败: {str(e)}")
                 await self._cleanup(conn)
@@ -235,10 +245,17 @@ class ASRProvider(ASRProviderBase):
                         
                         # 发送缓存音频
                         if conn.asr_audio:
+                            opus_config = getattr(conn, 'opus_config', None)
                             for cached_audio in conn.asr_audio[-10:]:
                                 try:
-                                    pcm_frame = self.decoder.decode(cached_audio, 960)
-                                    await self.asr_ws.send(pcm_frame)
+                                    pcm_data = decode_opus_to_pcm(
+                                        [cached_audio], opus_config,
+                                        target_sample_rate=ASR_TARGET_SAMPLE_RATE,
+                                        target_channels=ASR_TARGET_CHANNELS
+                                    )
+                                    if pcm_data:
+                                        pcm_frame = b"".join(pcm_data)
+                                        await self.asr_ws.send(pcm_frame)
                                 except Exception as e:
                                     logger.bind(tag=TAG).warning(f"发送缓存音频失败: {e}")
                                     break

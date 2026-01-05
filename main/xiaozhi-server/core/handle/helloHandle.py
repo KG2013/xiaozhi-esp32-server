@@ -8,6 +8,7 @@ from core.providers.tts.dto.dto import SentenceType
 from core.utils.wakeup_word import WakeupWordsConfig
 from core.handle.sendAudioHandle import sendAudioMessage, send_tts_message
 from core.utils.util import remove_punctuation_and_length, opus_datas_to_wav_bytes
+from core.utils.opus_encoder_utils import OpusConfig
 from core.providers.tools.device_mcp import (
     MCPClient,
     send_mcp_initialize_message,
@@ -45,7 +46,26 @@ async def handleHelloMessage(conn, msg_json):
         format = audio_params.get("format")
         conn.logger.bind(tag=TAG).info(f"客户端音频格式: {format}")
         conn.audio_format = format
+        conn.vbr = False if audio_params.get("vbr") == 0 else True
+        conn.frame_duration = int(audio_params.get("frame_duration", 60))
         conn.welcome_msg["audio_params"] = audio_params
+        
+        # 创建OpusConfig对象并保存到连接对象
+        # 确保所有数值参数都被转换为正确的类型（从JSON解析的值可能是字符串）
+        sample_rate = int(audio_params.get("sample_rate", 16000))
+        channels = int(audio_params.get("channels", 1))
+        frame_duration_ms = int(audio_params.get("frame_duration", 60))
+        vbr = conn.vbr
+        conn.opus_config = OpusConfig(
+            sample_rate=sample_rate,
+            channels=channels,
+            frame_duration_ms=frame_duration_ms,
+            vbr=vbr
+        )
+        conn.logger.bind(tag=TAG).info(
+            f"Opus配置已初始化: sample_rate={sample_rate}, channels={channels}, "
+            f"frame_duration_ms={frame_duration_ms}, vbr={vbr}, bitrate={conn.opus_config.bitrate}"
+        )
     features = msg_json.get("features")
     if features:
         conn.logger.bind(tag=TAG).info(f"客户端特性: {features}")
@@ -59,6 +79,12 @@ async def handleHelloMessage(conn, msg_json):
             asyncio.create_task(send_mcp_tools_list_request(conn))
 
     await conn.websocket.send(json.dumps(conn.welcome_msg))
+    
+    device = msg_json.get("device")
+    if device:
+        play_welcome_audio = device.get("play_welcome_audio")
+        if play_welcome_audio:
+            conn.play_welcome_audio = True
 
 
 async def checkWakeupWords(conn, text):
@@ -101,7 +127,11 @@ async def checkWakeupWords(conn, text):
         }
 
     # 获取音频数据
-    opus_packets = audio_to_data(response.get("file_path"))
+    opus_config = getattr(conn, 'opus_config', None)
+    opus_packets = audio_to_data(
+        response.get("file_path"),
+        opus_config=opus_config
+    )
     # 播放唤醒词回复
     conn.client_abort = False
 
@@ -141,7 +171,9 @@ async def wakeupWordsResponse(conn):
         # 获取当前音色
         voice = getattr(conn.tts, "voice", "default")
 
-        wav_bytes = opus_datas_to_wav_bytes(tts_result, sample_rate=16000)
+        # 获取Opus配置，如果连接对象没有配置则使用None（将使用默认配置）
+        opus_config = getattr(conn, 'opus_config', None)
+        wav_bytes = opus_datas_to_wav_bytes(tts_result, opus_config=opus_config)
         file_path = wakeup_words_config.generate_file_path(voice)
         with open(file_path, "wb") as f:
             f.write(wav_bytes)

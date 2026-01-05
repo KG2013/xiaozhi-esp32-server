@@ -1,12 +1,15 @@
 from typing import Dict, Optional
 
 from core.handle.textHandler.abortMessageHandler import AbortTextMessageHandler
+from core.handle.textHandler.greetingMessageHandler import GreetingTextMessageHandler
 from core.handle.textHandler.helloMessageHandler import HelloTextMessageHandler
 from core.handle.textHandler.iotMessageHandler import IotTextMessageHandler
+from core.handle.textHandler.leaveMessageHandler import LeaveTextMessageHandler
 from core.handle.textHandler.listenMessageHandler import ListenTextMessageHandler
 from core.handle.textHandler.mcpMessageHandler import McpTextMessageHandler
 from core.handle.textMessageHandler import TextMessageHandler
 from core.handle.textHandler.serverMessageHandler import ServerTextMessageHandler
+from core.handle.textHandler.volumeMessageHandler import VolumeTextMessageHandler
 
 TAG = __name__
 
@@ -27,6 +30,9 @@ class TextMessageHandlerRegistry:
             IotTextMessageHandler(),
             McpTextMessageHandler(),
             ServerTextMessageHandler(),
+            VolumeTextMessageHandler(),
+            GreetingTextMessageHandler(),
+            LeaveTextMessageHandler(),
         ]
 
         for handler in handlers:

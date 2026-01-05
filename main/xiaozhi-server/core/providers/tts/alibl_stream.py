@@ -5,13 +5,15 @@ import time
 import queue
 import asyncio
 import traceback
+import struct
 import websockets
 from asyncio import Task
 from config.logger import setup_logging
-from core.utils import opus_encoder_utils
+from core.utils.util import pcm_to_data_stream
 from core.utils.tts import MarkdownCleaner
 from core.providers.tts.base import TTSProviderBase
 from core.providers.tts.dto.dto import SentenceType, ContentType, InterfaceType
+from core.utils.opus_encoder_utils import OpusEncoderUtils
 
 TAG = __name__
 logger = setup_logging()
@@ -53,17 +55,19 @@ class TTSProvider(TTSProviderBase):
         pitch = config.get("pitch", "1.0")
         self.pitch = float(pitch) if pitch else 1.0
 
+        
+        self.bit_rate = 16
+
         self.header = {
             "Authorization": f"Bearer {self.api_key}",
             # "user-agent": "your_platform_info", // 可选
             # "X-DashScope-WorkSpace": workspace, // 可选，阿里云百炼业务空间ID
             "X-DashScope-DataInspection": "enable",
         }
+        
+        # Opus编码器实例（用于流式处理，避免帧边界错位）
+        self.opus_encoder = None
 
-        # 创建Opus编码器
-        self.opus_encoder = opus_encoder_utils.OpusEncoderUtils(
-            sample_rate=self.sample_rate, channels=1, frame_size_ms=60
-        )
 
     async def _ensure_connection(self):
         """确保WebSocket连接可用，支持60秒内连接复用"""
@@ -115,6 +119,8 @@ class TTSProvider(TTSProviderBase):
                 if message.sentence_type == SentenceType.FIRST:
                     # 初始化会话
                     try:
+                        # 设置标志，确保发送 tts start 消息
+                        self.tts_audio_first_sentence = True
                         if not getattr(self.conn, "sentence_id", None): 
                             self.conn.sentence_id = uuid.uuid4().hex
                             logger.bind(tag=TAG).info(f"自动生成新的 会话ID: {self.conn.sentence_id}")
@@ -224,6 +230,24 @@ class TTSProvider(TTSProviderBase):
 
             # 确保连接可用
             await self._ensure_connection()
+            
+            # 初始化Opus编码器（用于流式处理，避免帧边界错位）
+            opus_config = self.get_opus_config()
+            if opus_config and self.format == "pcm":
+                # 使用配置的帧大小进行编码，确保帧对齐
+                frame_duration_ms = opus_config.enc_frame_duration_ms
+                self.opus_encoder = OpusEncoderUtils(
+                    sample_rate=opus_config.sample_rate,
+                    channels=opus_config.channels,
+                    frame_size_ms=frame_duration_ms,
+                    vbr=opus_config.vbr,  # 使用配置的VBR模式
+                    bitrate=opus_config.bitrate  # 使用配置的码率
+                )
+                logger.bind(tag=TAG).debug(
+                    f"初始化Opus编码器: sample_rate={opus_config.sample_rate}, "
+                    f"channels={opus_config.channels}, frame_size_ms={frame_duration_ms}, "
+                    f"vbr={opus_config.vbr}, bitrate={opus_config.bitrate}"
+                )
 
             # 启动监听任务
             self._monitor_task = asyncio.create_task(self._start_monitor_tts_response())
@@ -248,6 +272,7 @@ class TTSProvider(TTSProviderBase):
                         "volume": self.volume,
                         "rate": self.rate,
                         "pitch": self.pitch,
+                        "bit_rate": self.bit_rate,
                     },
                     "input": {}
                 },
@@ -310,6 +335,14 @@ class TTSProvider(TTSProviderBase):
                 logger.bind(tag=TAG).warning(f"关闭时取消监听任务错误: {e}")
             self._monitor_task = None
 
+        # 重置Opus编码器状态
+        if self.opus_encoder:
+            try:
+                self.opus_encoder.reset_state()
+            except Exception as e:
+                logger.bind(tag=TAG).warning(f"重置Opus编码器状态时出错: {e}")
+            self.opus_encoder = None
+
         # 关闭WebSocket连接
         if self.ws:
             try:
@@ -353,6 +386,16 @@ class TTSProvider(TTSProviderBase):
                                     self.conn.tts_MessageText = None
                             elif event == "task-finished":
                                 logger.bind(tag=TAG).debug("TTS任务完成~")
+                                # 处理Opus编码器缓冲区中的剩余数据
+                                if self.opus_encoder:
+                                    try:
+                                        self.opus_encoder.encode_pcm_to_opus_stream(
+                                            pcm_data=b"",
+                                            end_of_stream=True,  # 标记流结束，处理剩余数据
+                                            callback=self.handle_opus
+                                        )
+                                    except Exception as e:
+                                        logger.bind(tag=TAG).warning(f"处理剩余Opus数据时出错: {e}")
                                 self._process_before_stop_play_files()
                                 session_finished = True
                                 break
@@ -366,9 +409,27 @@ class TTSProvider(TTSProviderBase):
                         except json.JSONDecodeError:
                             logger.bind(tag=TAG).warning("收到无效的JSON消息")
                     elif isinstance(msg, (bytes, bytearray)):
-                        self.opus_encoder.encode_pcm_to_opus_stream(
-                            msg, False, callback=self.handle_opus
-                        )
+                        if self.format == "pcm":
+                            # 使用带缓冲的Opus编码器处理流式数据，避免帧边界错位导致的杂音
+                            if self.opus_encoder:
+                                # 使用OpusEncoderUtils的流式编码，自动处理不完整的帧
+                                self.opus_encoder.encode_pcm_to_opus_stream(
+                                    pcm_data=msg,
+                                    end_of_stream=False,  # 流式数据，不是结束
+                                    callback=self.handle_opus
+                                )
+                            else:
+                                # 回退到原有方法（如果编码器未初始化）
+                                logger.bind(tag=TAG).warning("Opus编码器未初始化，使用回退方法")
+                                pcm_to_data_stream(
+                                    msg,
+                                    is_opus=True,
+                                    callback=self.handle_opus,
+                                    opus_config=self.get_opus_config()
+                                )
+                        else:
+                            self.handle_opus(extract_opus_packets(msg))
+                        
                 except websockets.ConnectionClosed:
                     logger.bind(tag=TAG).warning("WebSocket连接已关闭")
                     break
@@ -385,8 +446,18 @@ class TTSProvider(TTSProviderBase):
                 except:
                     pass
                 self.ws = None
-        # 监听任务退出时清理引用
+        # 监听任务退出时清理引用和处理剩余数据
         finally:
+            # 处理Opus编码器缓冲区中的剩余数据（防止数据丢失）
+            if self.opus_encoder:
+                try:
+                    self.opus_encoder.encode_pcm_to_opus_stream(
+                        pcm_data=b"",
+                        end_of_stream=True,  # 标记流结束，处理剩余数据
+                        callback=self.handle_opus
+                    )
+                except Exception as e:
+                    logger.bind(tag=TAG).warning(f"清理Opus编码器剩余数据时出错: {e}")
             self._monitor_task = None
 
     def to_tts(self, text: str) -> list:
@@ -432,6 +503,7 @@ class TTSProvider(TTSProviderBase):
                                 "volume": self.volume,
                                 "rate": self.rate,
                                 "pitch": self.pitch,
+                                "bit_rate": self.bit_rate,
                             },
                             "input": {}
                         },
@@ -486,10 +558,11 @@ class TTSProvider(TTSProviderBase):
                     while not task_finished:
                         msg = await ws.recv()
                         if isinstance(msg, (bytes, bytearray)):
-                            self.opus_encoder.encode_pcm_to_opus_stream(
+                            pcm_to_data_stream(
                                 msg,
-                                end_of_stream=False,
-                                callback=lambda opus: audio_data.append(opus)
+                                is_opus=True,
+                                callback=lambda opus: audio_data.append(opus),
+                                opus_config=self.get_opus_config()
                             )
                         elif isinstance(msg, str):
                             data = json.loads(msg)
@@ -520,3 +593,97 @@ class TTSProvider(TTSProviderBase):
         except Exception as e:
             logger.bind(tag=TAG).error(f"生成音频数据失败: {str(e)}")
             return []
+
+
+def parse_ogg_page(data):
+    """
+    解析 OGG 页面结构
+    """
+    if len(data) < 27:
+        logger.bind(tag=TAG).warning(f"OGG数据长度不足: {len(data)} 字节, 前27字节: {data[:27].hex() if len(data) >= 27 else data.hex()}")
+        raise ValueError("Not a valid OGG page: data too short")
+    
+    if data[0:4] != b'OggS':
+        logger.bind(tag=TAG).warning(f"OGG页面标识无效: 期望'OggS', 实际: {data[0:4]}, 前32字节: {data[:32].hex()}")
+        raise ValueError("Not a valid OGG page")
+    
+    version = data[4]
+    header_type = data[5]
+    granule_position = struct.unpack('<Q', data[6:14])[0]
+    bitstream_serial = struct.unpack('<I', data[14:18])[0]
+    page_sequence = struct.unpack('<I', data[18:22])[0]
+    checksum = struct.unpack('<I', data[22:26])[0]
+    page_segments = data[26]
+    
+    if len(data) < 27 + page_segments:
+        logger.bind(tag=TAG).warning(
+            f"OGG页面数据不完整: 总长度={len(data)}, 需要至少{27 + page_segments}字节, "
+            f"version={version}, header_type={header_type}, page_segments={page_segments}, "
+            f"前64字节: {data[:64].hex()}"
+        )
+        raise ValueError("Not a valid OGG page: incomplete segment table")
+    
+    segment_table = data[27:27+page_segments]
+    
+    # 计算数据偏移
+    header_size = 27 + page_segments
+    data_start = header_size
+    
+    logger.bind(tag=TAG).debug(
+        f"OGG页面解析成功: version={version}, header_type={header_type}, "
+        f"granule_position={granule_position}, bitstream_serial={bitstream_serial}, "
+        f"page_sequence={page_sequence}, page_segments={page_segments}, "
+        f"header_size={header_size}, segment_table_len={len(segment_table)}, "
+        f"data_len={len(data[data_start:])}"
+    )
+    
+    return {
+        'header_size': header_size,
+        'segment_table': segment_table,
+        'data': data[data_start:]
+    }
+
+def extract_opus_packets(ogg_data):
+    """
+    从 OGG 数据中提取 Opus 包
+    """
+    offset = 0
+    opus_packets = []
+    page_count = 0
+    
+    logger.bind(tag=TAG).debug(f"开始提取Opus包, 输入数据长度: {len(ogg_data)} 字节, 前32字节: {ogg_data[:32].hex() if len(ogg_data) >= 32 else ogg_data.hex()}")
+    
+    while offset < len(ogg_data):
+        try:
+            page = parse_ogg_page(ogg_data[offset:])
+            page_count += 1
+            offset += page['header_size']
+            
+            # 处理段数据
+            segment_data = page['data']
+            opus_packets.append(segment_data)
+            
+            logger.bind(tag=TAG).debug(
+                f"OGG页面 {page_count}: 提取了 {len(segment_data)} 字节的Opus数据, "
+                f"当前offset={offset}, 剩余数据={len(ogg_data) - offset} 字节"
+            )
+            
+            offset += len(segment_data)
+            
+        except (ValueError, struct.error) as e:
+            # 不是有效的 OGG 页面，可能已经是 Opus 数据
+            logger.bind(tag=TAG).warning(
+                f"OGG页面解析失败 (页面 {page_count + 1}): {type(e).__name__}: {e}, "
+                f"当前offset={offset}, 剩余数据长度={len(ogg_data) - offset}, "
+                f"剩余数据前64字节: {ogg_data[offset:offset+64].hex() if len(ogg_data) - offset >= 64 else ogg_data[offset:].hex()}"
+            )
+            opus_packets.append(ogg_data[offset:])
+            break
+    
+    result = b''.join(opus_packets)
+    logger.bind(tag=TAG).debug(
+        f"Opus包提取完成: 共解析 {page_count} 个OGG页面, "
+        f"提取了 {len(opus_packets)} 个数据包, 总输出长度: {len(result)} 字节"
+    )
+    
+    return result

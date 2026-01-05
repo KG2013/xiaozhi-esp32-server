@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="xiaozhi.modules.agent.dao.AgentDao">
+<mapper namespace="smhs.modules.agent.dao.AgentDao">
     <!-- 获取智能体的设备数量 -->
     <select id="getDeviceCountByAgentId" resultType="java.lang.Integer">
         SELECT COUNT(*) FROM ai_device WHERE agent_id = #{agentId}
     </select>
 
-    <resultMap id="AgentInfoMap" type="xiaozhi.modules.agent.vo.AgentInfoVO">
+    <resultMap id="AgentInfoMap" type="smhs.modules.agent.vo.AgentInfoVO">
         <id column="id"           property="id"/>
         <result column="userId"    property="userId"/>
         <result column="agentCode" property="agentCode"/>
@@ -39,6 +39,8 @@
                a.user_id           AS userId,
                a.agent_code        AS agentCode,
                a.agent_name        AS agentName,
+               a.greeting_message  AS greetingMessage,
+               a.leave_message     AS leaveMessage,
                a.asr_model_id      AS asrModelId,
                a.vad_model_id      AS vadModelId,
                a.llm_model_id      AS llmModelId,
@@ -70,6 +72,14 @@
                a.created_at        AS createdAt,
                a.updater,
                a.updated_at        AS updatedAt
+        FROM ai_agent a
+        WHERE a.id = #{agentId}
+    </select>
+
+    <!--获取智能体（角色）开场欢迎语和离场结束语-->
+    <select id="getGreetingAndLeave" resultType="smhs.modules.agent.vo.GreetingLeaveMessageVO">
+        SELECT a.greeting_message AS greetingMessage,
+               a.leave_message     AS leaveMessage
         FROM ai_agent a
         WHERE a.id = #{agentId}
     </select>

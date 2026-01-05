@@ -4,7 +4,6 @@ import base64
 import hashlib
 import asyncio
 import websockets
-import opuslib_next
 from time import mktime
 from datetime import datetime
 from urllib.parse import urlencode
@@ -13,6 +12,7 @@ from config.logger import setup_logging
 from wsgiref.handlers import format_date_time
 from core.providers.asr.base import ASRProviderBase
 from core.providers.asr.dto.dto import InterfaceType
+from core.utils.util import decode_opus_to_pcm
 
 TAG = __name__
 logger = setup_logging()
@@ -22,6 +22,10 @@ STATUS_FIRST_FRAME = 0  # 第一帧的标识
 STATUS_CONTINUE_FRAME = 1  # 中间帧标识
 STATUS_LAST_FRAME = 2  # 最后一帧的标识
 
+# ASR服务要求的音频格式
+ASR_TARGET_SAMPLE_RATE = 16000
+ASR_TARGET_CHANNELS = 1
+
 
 class ASRProvider(ASRProviderBase):
     def __init__(self, config, delete_audio_file):
@@ -29,7 +33,6 @@ class ASRProvider(ASRProviderBase):
         self.interface_type = InterfaceType.STREAM
         self.config = config
         self.text = ""
-        self.decoder = opuslib_next.Decoder(16000, 1)
         self.asr_ws = None
         self.forward_task = None
         self.is_processing = False
@@ -121,8 +124,16 @@ class ASRProvider(ASRProviderBase):
         # 发送当前音频数据
         if self.asr_ws and self.is_processing and self.server_ready:
             try:
-                pcm_frame = self.decoder.decode(audio, 960)
-                await self._send_audio_frame(pcm_frame, STATUS_CONTINUE_FRAME)
+                # 获取连接的Opus配置，使用统一解码方法转换为ASR需要的格式
+                opus_config = getattr(conn, 'opus_config', None)
+                pcm_data = decode_opus_to_pcm(
+                    [audio], opus_config,
+                    target_sample_rate=ASR_TARGET_SAMPLE_RATE,
+                    target_channels=ASR_TARGET_CHANNELS
+                )
+                if pcm_data:
+                    pcm_frame = b"".join(pcm_data)
+                    await self._send_audio_frame(pcm_frame, STATUS_CONTINUE_FRAME)
             except Exception as e:
                 logger.bind(tag=TAG).warning(f"发送音频数据时发生错误: {e}")
                 await self._cleanup(conn)
@@ -152,9 +163,13 @@ class ASRProvider(ASRProviderBase):
             # 发送首帧音频
             if conn.asr_audio and len(conn.asr_audio) > 0:
                 first_audio = conn.asr_audio[-1] if conn.asr_audio else b""
-                pcm_frame = (
-                    self.decoder.decode(first_audio, 960) if first_audio else b""
-                )
+                opus_config = getattr(conn, 'opus_config', None)
+                pcm_data = decode_opus_to_pcm(
+                    [first_audio], opus_config,
+                    target_sample_rate=ASR_TARGET_SAMPLE_RATE,
+                    target_channels=ASR_TARGET_CHANNELS
+                ) if first_audio else []
+                pcm_frame = b"".join(pcm_data) if pcm_data else b""
                 await self._send_audio_frame(pcm_frame, STATUS_FIRST_FRAME)
                 self.server_ready = True
                 logger.bind(tag=TAG).info("已发送首帧，开始识别")
@@ -162,8 +177,14 @@ class ASRProvider(ASRProviderBase):
                 # 发送缓存的音频数据
                 for cached_audio in conn.asr_audio[-10:]:
                     try:
-                        pcm_frame = self.decoder.decode(cached_audio, 960)
-                        await self._send_audio_frame(pcm_frame, STATUS_CONTINUE_FRAME)
+                        pcm_data = decode_opus_to_pcm(
+                            [cached_audio], opus_config,
+                            target_sample_rate=ASR_TARGET_SAMPLE_RATE,
+                            target_channels=ASR_TARGET_CHANNELS
+                        )
+                        if pcm_data:
+                            pcm_frame = b"".join(pcm_data)
+                            await self._send_audio_frame(pcm_frame, STATUS_CONTINUE_FRAME)
                     except Exception as e:
                         logger.bind(tag=TAG).info(f"发送缓存音频数据时发生错误: {e}")
                         break
@@ -411,7 +432,13 @@ class ASRProvider(ASRProviderBase):
                     last_frame = b""
                     if asr_audio_task:
                         last_audio = asr_audio_task[-1]
-                        last_frame = self.decoder.decode(last_audio, 960)
+                        opus_config = getattr(conn, 'opus_config', None)
+                        pcm_data = decode_opus_to_pcm(
+                            [last_audio], opus_config,
+                            target_sample_rate=ASR_TARGET_SAMPLE_RATE,
+                            target_channels=ASR_TARGET_CHANNELS
+                        )
+                        last_frame = b"".join(pcm_data) if pcm_data else b""
                     await self._send_audio_frame(last_frame, STATUS_LAST_FRAME)
                     logger.bind(tag=TAG).info("已发送最后一帧")
 

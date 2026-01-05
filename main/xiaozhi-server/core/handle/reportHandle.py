@@ -11,9 +11,10 @@ TTS上报功能已集成到ConnectionHandler类中。
 
 import time
 
-import opuslib_next
-
 from config.manage_api_client import report as manage_report
+from core.utils.util import decode_opus_to_pcm
+from core.utils.opus_encoder_utils import OpusConfig
+from typing import Optional
 
 TAG = __name__
 
@@ -35,7 +36,7 @@ def report(conn, type, text, opus_data, report_time):
             audio_data = None
         # 执行上报
         manage_report(
-            mac_address=conn.device_id,
+            ssid=conn.device_id,
             session_id=conn.session_id,
             chat_type=type,
             content=text,
@@ -50,21 +51,17 @@ def opus_to_wav(conn, opus_data):
     """将Opus数据转换为WAV格式的字节流
 
     Args:
-        output_dir: 输出目录（保留参数以保持接口兼容）
+        conn: 连接对象
         opus_data: opus音频数据
 
     Returns:
         bytes: WAV格式的音频数据
     """
-    decoder = opuslib_next.Decoder(16000, 1)  # 16kHz, 单声道
-    pcm_data = []
-
-    for opus_packet in opus_data:
-        try:
-            pcm_frame = decoder.decode(opus_packet, 960)  # 960 samples = 60ms
-            pcm_data.append(pcm_frame)
-        except opuslib_next.OpusError as e:
-            conn.logger.bind(tag=TAG).error(f"Opus解码错误: {e}", exc_info=True)
+    # 获取Opus配置，如果连接对象没有配置则使用None（将使用默认配置）
+    opus_config = getattr(conn, 'opus_config', None)
+    
+    # 使用util.py中的统一解码函数进行解码
+    pcm_data = decode_opus_to_pcm(opus_data, opus_config)
 
     if not pcm_data:
         raise ValueError("没有有效的PCM数据")
@@ -72,6 +69,12 @@ def opus_to_wav(conn, opus_data):
     # 创建WAV文件头
     pcm_data_bytes = b"".join(pcm_data)
     num_samples = len(pcm_data_bytes) // 2  # 16-bit samples
+
+    # 获取采样率，如果有配置则使用配置的采样率，否则使用默认16000
+    sample_rate = opus_config.sample_rate if opus_config else 16000
+    num_channels = opus_config.channels if opus_config else 1
+    byte_rate = sample_rate * num_channels * 2  # 采样率 * 通道数 * 2字节(16bit)
+    block_align = num_channels * 2  # 通道数 * 2字节(16bit)
 
     # WAV文件头
     wav_header = bytearray()
@@ -81,10 +84,10 @@ def opus_to_wav(conn, opus_data):
     wav_header.extend(b"fmt ")  # Subchunk1ID
     wav_header.extend((16).to_bytes(4, "little"))  # Subchunk1Size
     wav_header.extend((1).to_bytes(2, "little"))  # AudioFormat (PCM)
-    wav_header.extend((1).to_bytes(2, "little"))  # NumChannels
-    wav_header.extend((16000).to_bytes(4, "little"))  # SampleRate
-    wav_header.extend((32000).to_bytes(4, "little"))  # ByteRate
-    wav_header.extend((2).to_bytes(2, "little"))  # BlockAlign
+    wav_header.extend((num_channels).to_bytes(2, "little"))  # NumChannels
+    wav_header.extend((sample_rate).to_bytes(4, "little"))  # SampleRate
+    wav_header.extend((byte_rate).to_bytes(4, "little"))  # ByteRate
+    wav_header.extend((block_align).to_bytes(2, "little"))  # BlockAlign
     wav_header.extend((16).to_bytes(2, "little"))  # BitsPerSample
     wav_header.extend(b"data")  # Subchunk2ID
     wav_header.extend(len(pcm_data_bytes).to_bytes(4, "little"))  # Subchunk2Size

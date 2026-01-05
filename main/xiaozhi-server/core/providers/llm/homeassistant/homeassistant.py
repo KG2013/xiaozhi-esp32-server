@@ -16,7 +16,7 @@ class LLMProvider(LLMProviderBase):
 
     def response(self, session_id, dialogue, **kwargs):
         try:
-            # home assistant语音助手自带意图，无需使用xiaozhi ai自带的，只需要把用户说的话传递给home assistant即可
+            # home assistant语音助手自带意图，无需使用smhs ai自带的，只需要把用户说的话传递给home assistant即可
 
             # 提取最后一个 role 为 'user' 的 content
             input_text = None

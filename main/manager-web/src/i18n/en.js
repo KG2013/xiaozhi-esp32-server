@@ -201,7 +201,7 @@ export default {
   'firmwareDialog.firmwareFile': 'Firmware File',
   'firmwareDialog.clickUpload': 'Click to Upload',
   'firmwareDialog.uploadTip': 'Only firmware files (.bin/.apk) are supported, and size should not exceed 100MB',
-  'firmwareDialog.uploadHint': 'Warm reminder: Please upload the pre-merged xiaozhi.bin file, not the merged merged-binary.bin file',
+  'firmwareDialog.uploadHint': 'Warm reminder: Please upload the pre-merged smhs.bin file, not the merged merged-binary.bin file',
   'firmwareDialog.remark': 'Remark',
   'firmwareDialog.remarkPlaceholder': 'Please enter remark information',
   'firmwareDialog.requiredFirmwareName': 'Please enter firmware name (board + version)',
@@ -275,7 +275,7 @@ export default {
 
   // Register page related
   'register.title': 'Create Account',
-  'register.welcome': 'Welcome to XiaoZhi AI',
+  'register.welcome': 'Welcome to Smhs AI',
   'register.usernamePlaceholder': 'Please enter username',
   'register.mobilePlaceholder': 'Please enter mobile phone number',
   'register.captchaPlaceholder': 'Please enter captcha',
@@ -511,7 +511,7 @@ export default {
   'button.close': 'Close',
 
   // System information
-  'system.name': 'XiaoZhi Service',
+  'system.name': 'Smhs Service',
 
   // Voiceprint related
   'voiceprint.management': 'Voiceprint Management',
@@ -841,6 +841,8 @@ export default {
   'modelConfigDialog.modelInfo': 'Model Information',
   'modelConfigDialog.enable': 'Enable',
   'modelConfigDialog.setDefault': 'Set as Default',
+  'modelConfigDialog.modelId': 'Model ID',
+  'modelConfigDialog.enterModelId': 'If not filled in, it will be generated automatically',
   'modelConfigDialog.modelName': 'Model Name',
   'modelConfigDialog.enterModelName': 'Please enter model name',
   'modelConfigDialog.modelCode': 'Model Code',

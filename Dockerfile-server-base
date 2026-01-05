@@ -14,10 +14,10 @@ RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/ && \
     pip config set global.timeout 120 && \
     pip config set install.retries 5
 
-WORKDIR /opt/xiaozhi-esp32-server
+WORKDIR /opt/smhs-esp32-server
 
 # 复制requirements.txt
-COPY main/xiaozhi-server/requirements.txt .
+COPY main/smhs-server/requirements.txt .
 
 # 安装Python依赖
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \

@@ -76,7 +76,15 @@ def get_config_from_api(config):
 
 def get_private_config_from_api(config, device_id, client_id):
     """从Java API获取私有配置"""
-    return get_agent_models(device_id, client_id, config["selected_module"])
+    from config.logger import setup_logging
+    logger = setup_logging()
+    
+    ssid = device_id or client_id
+    cid = client_id or device_id
+    
+    logger.info(f"get_private_config_from_api 调用参数: device_id={device_id}, client_id={client_id}, 生成 ssid={ssid}, cid={cid}")
+    
+    return get_agent_models(ssid, cid, config["selected_module"])
 
 
 def ensure_directories(config):

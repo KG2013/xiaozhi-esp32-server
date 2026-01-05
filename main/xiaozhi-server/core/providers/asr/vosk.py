@@ -44,7 +44,7 @@ class ASRProvider(ASRProviderBase):
             raise
 
     async def speech_to_text(
-        self, audio_data: List[bytes], session_id: str, audio_format: str = "opus"
+        self, audio_data: List[bytes], session_id: str, audio_format: str = "opus", opus_config=None
     ) -> Tuple[Optional[str], Optional[str]]:
         """将语音数据转换为文本"""
         file_path = None
@@ -58,7 +58,7 @@ class ASRProvider(ASRProviderBase):
             if audio_format == "pcm":
                 pcm_data = audio_data
             else:
-                pcm_data = self.decode_opus(audio_data)
+                pcm_data = self.decode_opus(audio_data, opus_config)
                 
             if not pcm_data:
                 logger.bind(tag=TAG).warning("解码后的PCM数据为空，无法进行识别")

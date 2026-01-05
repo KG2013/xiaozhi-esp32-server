@@ -36,7 +36,16 @@ async def handle_user_intent(conn, text):
         # 使用支持function calling的聊天方法,不再进行意图分析
         return False
     # 使用LLM进行意图分析
+    # 记录意图识别开始时间
+    if hasattr(conn, 'performance_tracker'):
+        conn.performance_tracker.record("intent_start")
+    
     intent_result = await analyze_intent_with_llm(conn, text)
+    
+    # 记录意图识别结束时间
+    if hasattr(conn, 'performance_tracker'):
+        conn.performance_tracker.record("intent_end")
+    
     if not intent_result:
         return False
     # 会话开始时生成sentence_id
@@ -53,7 +62,7 @@ async def check_direct_exit(conn, text):
         if text == cmd:
             conn.logger.bind(tag=TAG).info(f"识别到明确的退出命令: {text}")
             await send_stt_message(conn, text)
-            await conn.close()
+            await conn.close(reason=f"Exit command detected: {text}")
             return True
     return False
 

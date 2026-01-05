@@ -30,7 +30,7 @@ class SimpleHttpServer:
         if websocket_config and "你" not in websocket_config:
             return websocket_config
         else:
-            return f"ws://{local_ip}:{port}/xiaozhi/v1/"
+            return f"ws://{local_ip}:{port}/smhs/v1/"
 
     async def start(self):
         server_config = self.config["server"]
@@ -45,9 +45,9 @@ class SimpleHttpServer:
                 # 如果没有开启智控台，只是单模块运行，就需要再添加简单OTA接口，用于下发websocket接口
                 app.add_routes(
                     [
-                        web.get("/xiaozhi/ota/", self.ota_handler.handle_get),
-                        web.post("/xiaozhi/ota/", self.ota_handler.handle_post),
-                        web.options("/xiaozhi/ota/", self.ota_handler.handle_post),
+                        web.get("/smhs/ota/", self.ota_handler.handle_get),
+                        web.post("/smhs/ota/", self.ota_handler.handle_post),
+                        web.options("/smhs/ota/", self.ota_handler.handle_post),
                     ]
                 )
             # 添加路由
