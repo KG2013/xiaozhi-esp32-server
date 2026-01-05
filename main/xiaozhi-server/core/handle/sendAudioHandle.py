@@ -108,7 +108,7 @@ async def sendAudio(conn, audios, frame_duration=AUDIO_FRAME_DURATION):
     """
     if audios is None or len(audios) == 0:
         return
-
+    frame_duration = conn.opus_config.enc_frame_duration_ms
     send_delay = conn.config.get("tts_audio_send_delay", -1) / 1000.0
     is_single_packet = isinstance(audios, bytes)
 

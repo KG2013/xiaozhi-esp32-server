@@ -35,7 +35,7 @@ async def report(conn, type, text, opus_data, report_time):
         else:
             audio_data = None
         # 执行上报
-       await manage_report(
+        await manage_report(
             ssid=conn.device_id,
             session_id=conn.session_id,
             chat_type=type,

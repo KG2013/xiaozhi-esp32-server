@@ -188,5 +188,5 @@ uploadfile
 
 main/smhs-server/models/SenseVoiceSmall/model.pt
 main/manager-api/src/main/resources/application.yml
+main/smhs-server/data/
 .gitignore
-
