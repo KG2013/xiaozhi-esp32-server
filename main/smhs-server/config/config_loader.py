@@ -95,7 +95,7 @@ async def get_private_config_from_api(config, device_id, client_id):
     
     logger.info(f"get_private_config_from_api 调用参数: device_id={device_id}, client_id={client_id}, 生成 ssid={ssid}, cid={cid}")
     
-    return get_agent_models(ssid, cid, config["selected_module"])
+    return await get_agent_models(ssid, cid, config["selected_module"])
 
 
 

@@ -44,7 +44,7 @@ module.exports = defineConfig({
     port: 18001, // 指定端口为 18001
     proxy: {
       '/smhs': {
-        target: 'http://192.168.1.11:18002',
+        target: 'http://127.0.0.1:18002',
         changeOrigin: true
       }
     },

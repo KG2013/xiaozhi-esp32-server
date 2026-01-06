@@ -101,7 +101,7 @@ class ASRProviderBase(ABC):
                 wav_data = self._pcm_to_wav(combined_pcm_data)
 
             # 定义ASR任务
-            asr_task = self.speech_to_text(asr_audio_task, conn.session_id, conn.audio_format)
+            asr_task = self.speech_to_text(pcm_data, conn.session_id, "pcm")
 
             if conn.voiceprint_provider and wav_data:
                 voiceprint_task = conn.voiceprint_provider.identify_speaker(wav_data, conn.session_id)
