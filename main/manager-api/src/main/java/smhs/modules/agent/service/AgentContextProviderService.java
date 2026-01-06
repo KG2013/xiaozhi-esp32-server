@@ -1,7 +1,7 @@
-package xiaozhi.modules.agent.service;
+package smhs.modules.agent.service;
 
-import xiaozhi.common.service.BaseService;
-import xiaozhi.modules.agent.entity.AgentContextProviderEntity;
+import smhs.common.service.BaseService;
+import smhs.modules.agent.entity.AgentContextProviderEntity;
 
 public interface AgentContextProviderService extends BaseService<AgentContextProviderEntity> {
     /**

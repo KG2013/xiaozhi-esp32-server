@@ -1,4 +1,4 @@
-package xiaozhi.modules.agent.service.impl;
+package smhs.modules.agent.service.impl;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,20 +14,20 @@ import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 
 import lombok.RequiredArgsConstructor;
-import xiaozhi.modules.agent.dto.AgentChatHistoryDTO;
-import xiaozhi.modules.agent.dto.AgentChatSummaryDTO;
-import xiaozhi.modules.agent.dto.AgentMemoryDTO;
-import xiaozhi.modules.agent.dto.AgentUpdateDTO;
-import xiaozhi.modules.agent.entity.AgentChatHistoryEntity;
-import xiaozhi.modules.agent.service.AgentChatHistoryService;
-import xiaozhi.modules.agent.service.AgentChatSummaryService;
-import xiaozhi.modules.agent.service.AgentService;
-import xiaozhi.modules.agent.vo.AgentInfoVO;
-import xiaozhi.modules.device.entity.DeviceEntity;
-import xiaozhi.modules.device.service.DeviceService;
-import xiaozhi.modules.llm.service.LLMService;
-import xiaozhi.modules.model.entity.ModelConfigEntity;
-import xiaozhi.modules.model.service.ModelConfigService;
+import smhs.modules.agent.dto.AgentChatHistoryDTO;
+import smhs.modules.agent.dto.AgentChatSummaryDTO;
+import smhs.modules.agent.dto.AgentMemoryDTO;
+import smhs.modules.agent.dto.AgentUpdateDTO;
+import smhs.modules.agent.entity.AgentChatHistoryEntity;
+import smhs.modules.agent.service.AgentChatHistoryService;
+import smhs.modules.agent.service.AgentChatSummaryService;
+import smhs.modules.agent.service.AgentService;
+import smhs.modules.agent.vo.AgentInfoVO;
+import smhs.modules.device.entity.DeviceEntity;
+import smhs.modules.device.service.DeviceService;
+import smhs.modules.llm.service.LLMService;
+import smhs.modules.model.entity.ModelConfigEntity;
+import smhs.modules.model.service.ModelConfigService;
 
 /**
  * 智能体聊天记录总结服务实现类

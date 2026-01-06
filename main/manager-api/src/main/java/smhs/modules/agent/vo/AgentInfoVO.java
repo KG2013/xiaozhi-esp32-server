@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import smhs.modules.agent.dto.ContextProviderDTO;
 import smhs.modules.agent.entity.AgentEntity;
 import smhs.modules.agent.entity.AgentPluginMapping;
 

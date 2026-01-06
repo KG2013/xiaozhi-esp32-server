@@ -93,7 +93,7 @@ public class ServerSideManageController {
         String deviceId = UUID.randomUUID().toString();
         String clientId = UUID.randomUUID().toString();
 
-        String redisKey = xiaozhi.common.redis.RedisKeys.getTmpRegisterMacKey(deviceId);
+        String redisKey = smhs.common.redis.RedisKeys.getTmpRegisterMacKey(deviceId);
         redisUtils.set(redisKey, "true", 300); // 5分钟有效期
 
         WebSocketHttpHeaders headers = new WebSocketHttpHeaders();
